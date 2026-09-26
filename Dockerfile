@@ -5,9 +5,10 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # league/commonmark requires ext-mbstring, which isn't compiled in by default
 # and needs the Oniguruma headers to build. libonig-dev is left installed
 # (not purged) since mbstring.so links against its runtime library, and
-# apt's --auto-remove would otherwise cascade-remove that too.
+# apt's --auto-remove would otherwise cascade-remove that too. unzip is for
+# Composer, which otherwise has no way to extract package dist archives.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libonig-dev \
+    && apt-get install -y --no-install-recommends libonig-dev unzip \
     && docker-php-ext-install mbstring \
     && rm -rf /var/lib/apt/lists/*
 
