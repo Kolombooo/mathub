@@ -104,6 +104,7 @@ if ($method === 'GET' && count($decoded) === 4 && $decoded[0] === 'class') {
     if ($classTitle === null || $topicTitle === null || $content === null) {
         notFound();
     }
+    $html = Markdown::toHtml($content);
     View::render('material', [
         'title' => Storage::getMaterialTitle($classSlug, $topicSlug, $materialSlug),
         'bodyClass' => 'page-material',
@@ -112,7 +113,8 @@ if ($method === 'GET' && count($decoded) === 4 && $decoded[0] === 'class') {
         'classTitle' => $classTitle,
         'topicSlug' => $topicSlug,
         'topicTitle' => $topicTitle,
-        'html' => Markdown::toHtml($content),
+        'html' => $html,
+        'toc' => Markdown::extractHeadings($html),
     ]);
     exit;
 }
