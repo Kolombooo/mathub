@@ -8,12 +8,12 @@ services:
       - mathub_content:/var/www/html/content
       - mathub_data:/var/www/html/data
     networks:
-      - npm
+      - proxy_network
 
 volumes:
   mathub_content:
   mathub_data:
 
 networks:
-  npm:
+  proxy_network:
     external: true
