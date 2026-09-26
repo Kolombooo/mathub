@@ -2,6 +2,9 @@ FROM php:8.2-apache
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# league/commonmark requires ext-mbstring, which isn't compiled in by default.
+RUN docker-php-ext-install mbstring
+
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 RUN a2enmod rewrite
 
