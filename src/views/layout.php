@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= isset($title) ? View::e($title) . ' · MatHub' : 'MatHub' ?></title>
-<link rel="stylesheet" href="/assets/style.css">
+<link rel="stylesheet" href="<?= View::e(View::asset('/assets/style.css')) ?>">
 </head>
 <body class="<?= View::e($bodyClass ?? '') ?>">
 <header class="site-header">

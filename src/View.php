@@ -32,4 +32,16 @@ final class View
     {
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
+
+    /**
+     * Appends a cache-busting ?v=<mtime> to a /assets/... URL, so browsers
+     * fetch a fresh copy whenever the file actually changes instead of
+     * serving a stale cached one after a deploy.
+     */
+    public static function asset(string $path): string
+    {
+        $file = dirname(__DIR__) . '/public' . $path;
+        $version = is_file($file) ? (string)filemtime($file) : (string)time();
+        return $path . '?v=' . $version;
+    }
 }

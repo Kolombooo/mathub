@@ -71,4 +71,4 @@
         <?php endforeach; ?>
     </ul>
 <?php endif; ?>
-<script src="/assets/admin.js"></script>
+<script src="<?= View::e(View::asset('/assets/admin.js')) ?>"></script>

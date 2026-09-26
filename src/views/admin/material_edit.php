@@ -30,4 +30,4 @@
     window.MATHUB_UPLOAD_URL = "/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>/uploads";
     window.MATHUB_CSRF = "<?= Csrf::token() ?>";
 </script>
-<script src="/assets/admin.js"></script>
+<script src="<?= View::e(View::asset('/assets/admin.js')) ?>"></script>
