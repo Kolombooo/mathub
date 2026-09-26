@@ -1,0 +1,19 @@
+services:
+  mathub:
+    build: .
+    image: mathub:latest
+    container_name: mathub
+    restart: unless-stopped
+    volumes:
+      - mathub_content:/var/www/html/content
+      - mathub_data:/var/www/html/data
+    networks:
+      - npm
+
+volumes:
+  mathub_content:
+  mathub_data:
+
+networks:
+  npm:
+    external: true

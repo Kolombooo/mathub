@@ -1,0 +1,6 @@
+/vendor/
+/data/users.json
+/content/*
+!/content/.htaccess
+.idea/
+.claude

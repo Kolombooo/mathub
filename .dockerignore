@@ -1,0 +1,9 @@
+.git
+.idea
+.claude
+vendor/
+content/*
+!content/.htaccess
+data/*
+!data/.htaccess
+*.md
