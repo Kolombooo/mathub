@@ -16,7 +16,8 @@
  *                          place requestFullscreen() is allowed)
  *     init(ctx)            exam is rendered. ctx = { root, exam, settings,
  *                          log(type, detail, atMs), beacon(type, detail),
- *                          resumed, lastSeen, suspendBlur(), t(key) }
+ *                          resumed, lastSeen, suspendBlur(), t(key) }  (suspendBlur: call before opening a
+ *                          native dialog such as a file picker)
  *     onBeforeSubmit()     close any open "episodes" so they are logged
  *     onFinish()           exam submitted: clean up (leave fullscreen, ...)
  * Every question is a  <section data-question-id data-question-type>  and every
@@ -156,6 +157,42 @@
         });
         (children || []).forEach(function (c) { if (c) { node.appendChild(c); } });
         return node;
+    }
+
+    // In-page replacement for confirm()/alert(). Native dialogs do not render
+    // over a fullscreen page in Firefox (the page just looks frozen), so
+    // everything the student has to answer is drawn inside the document.
+    // Resolves true/false. `okLabel`/`cancelLabel`: cancelLabel null = alert-style.
+    function showDialog(message, okLabel, cancelLabel) {
+        return new Promise(function (resolve) {
+            var overlay = el('div', { class: 'modal-overlay dialog-overlay' });
+            var ok = el('button', { type: 'button', text: okLabel });
+            var actions = el('div', { class: 'modal-actions' });
+            var previous = document.activeElement;
+            function done(result) {
+                document.removeEventListener('keydown', onKey, true);
+                overlay.remove();
+                if (previous && previous.focus) { previous.focus(); }
+                resolve(result);
+            }
+            function onKey(e) {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+            }
+            ok.addEventListener('click', function () { done(true); });
+            if (cancelLabel) {
+                var cancel = el('button', { type: 'button', class: 'button-secondary', text: cancelLabel });
+                cancel.addEventListener('click', function () { done(false); });
+                actions.appendChild(cancel);
+            }
+            actions.appendChild(ok);
+            overlay.appendChild(el('div', { class: 'modal dialog', role: 'dialog', 'aria-modal': 'true' }, [
+                el('p', { class: 'dialog-text', text: message }),
+                actions
+            ]));
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(overlay);
+            ok.focus();
+        });
     }
 
     function shuffle(arr) {
@@ -405,7 +442,7 @@
             var f = input.files[0];
             if (!f) { return; }
             if (f.size > MAX_FILE) {
-                alert(t('file_too_large'));
+                showDialog(t('file_too_large'), t('dialog_ok'), null);
                 input.value = '';
                 return;
             }
@@ -684,8 +721,13 @@
     function submitExam(button, errorBox) {
         if (state.submitting) { return; }
         var unanswered = state.exam.questions.filter(function (q) { return !isAnswered(q); }).length;
-        suspendBlur(500); // confirm() blocks JS, so this fires right after it closes
-        if (!confirm(unanswered ? t('unanswered') : t('confirm_submit'))) { return; }
+        showDialog(unanswered ? t('unanswered') : t('confirm_submit'), t('submit'), t('dialog_cancel')).then(function (yes) {
+            if (yes) { doSubmit(button, errorBox); }
+        });
+    }
+
+    function doSubmit(button, errorBox) {
+        if (state.submitting) { return; }
         Guard.call('onBeforeSubmit');
 
         state.submitting = true;
