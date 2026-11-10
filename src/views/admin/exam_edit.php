@@ -17,6 +17,19 @@
         Published (visible to students who know the class code)
     </label>
 
+    <fieldset class="settings">
+        <legend>Anti-cheating</legend>
+        <?php $st = Exams::settingsOf($exam); ?>
+        <label class="check">
+            <input type="checkbox" name="monitor" value="1" <?= $st['monitor'] ? 'checked' : '' ?>>
+            Log leaving the page (tab switch, new window), closing the browser and leaving fullscreen. Students are told this is recorded.
+        </label>
+        <label class="check">
+            <input type="checkbox" name="fullscreen" value="1" <?= $st['fullscreen'] ? 'checked' : '' ?>>
+            Start the exam in fullscreen and require it until the exam is submitted
+        </label>
+    </fieldset>
+
     <h2>Questions</h2>
     <p class="empty">Correct answers are optional. Questions without one (and long text, file upload and drawing) are scored by hand. Students never see scores.</p>
     <div id="questions"></div>

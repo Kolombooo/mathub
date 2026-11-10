@@ -28,6 +28,7 @@ foreach ($submissions as $s) {
             <li>
                 <a href="<?= $examBase ?>/submissions/<?= $s['id'] ?>"><?= View::e($s['lastName'] . ' ' . $s['firstName']) ?></a>
                 <span class="actions">
+                    <?php $fl = Exams::flagSummary($s); if ($fl['count']): ?><span class="flag"><?= $fl['count'] ?> flag<?= $fl['count'] === 1 ? '' : 's' ?></span><?php endif; ?>
                     <span class="muted">started <?= date('H:i', $s['startedAt']) ?> &middot; <?= $fmtTime(max(0, time() - $s['startedAt'])) ?> elapsed</span>
                     <form method="post" action="<?= $examBase ?>/submissions/<?= $s['id'] ?>/delete" class="inline-form" onsubmit="return confirm('Remove this unfinished attempt?');">
                         <?= Csrf::field() ?>
@@ -44,7 +45,7 @@ foreach ($submissions as $s) {
     <p class="empty">No submissions yet.</p>
 <?php else: ?>
     <table class="data-table">
-        <thead><tr><th>Student</th><th>Submitted</th><th>Time taken</th><th>Score</th><th>Status</th></tr></thead>
+        <thead><tr><th>Student</th><th>Submitted</th><th>Time taken</th><th>Score</th><th>Flags</th><th>Status</th></tr></thead>
         <tbody>
         <?php foreach (array_merge($groups['submitted'], $groups['marked']) as $s): ?>
             <tr>
@@ -52,6 +53,8 @@ foreach ($submissions as $s) {
                 <td><?= date('Y-m-d H:i', (int)$s['submittedAt']) ?></td>
                 <td><?= $fmtTime((int)($s['durationSec'] ?? 0)) ?></td>
                 <td><?= round(Exams::totalScore($s), 2) ?> / <?= round($maxScore, 2) ?></td>
+                <?php $fl = Exams::flagSummary($s); ?>
+                <td><?php if ($fl['count']): ?><span class="flag" title="Left the page for <?= $fl['awaySec'] ?>s in total"><?= $fl['count'] ?> &#9873;<?= $fl['awaySec'] ? ' · ' . sprintf('%d:%02d', intdiv($fl['awaySec'], 60), $fl['awaySec'] % 60) . ' away' : '' ?></span><?php else: ?><span class="muted">–</span><?php endif; ?></td>
                 <td><span class="badge <?= $s['status'] === 'marked' ? 'badge-ok' : '' ?>"><?= $s['status'] === 'marked' ? 'Marked' : 'To mark' ?></span></td>
             </tr>
         <?php endforeach; ?>

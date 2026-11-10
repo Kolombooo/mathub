@@ -84,6 +84,16 @@ if ($method === 'POST' && count($decoded) === 4 && $decoded[0] === 'exams' && $d
     ]);
 }
 
+// Browser telemetry sent via sendBeacon while the page is closing.
+if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $decoded[3] === 'event') {
+    [, $classSlug, $examId, , $sid] = $decoded;
+    if (Csrf::verify($_POST['csrf_token'] ?? null)) {
+        Exams::addBeaconEvent($classSlug, $examId, $sid, (string)($_POST['type'] ?? ''), json_decode((string)($_POST['detail'] ?? 'null'), true));
+    }
+    http_response_code(204);
+    exit;
+}
+
 // Final submission: one multipart POST with all answers and files.
 if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $decoded[3] === 'submit') {
     [, $classSlug, $examId, , $sid] = $decoded;

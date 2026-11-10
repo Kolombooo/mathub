@@ -7,23 +7,26 @@
  * POST at the end. No polling, no websockets.
  *
  * ---------------------------------------------------------------------
- * Anti-cheating hook point (NOT implemented yet)
+ * Anti-cheating: window.MathubExamGuard
  * ---------------------------------------------------------------------
- * window.MathubExamGuard is a tiny registry. A guard module is an object
- *     { name: 'no-paste', init: function (ctx) { ... } }
- * registered with MathubExamGuard.register(module) before the exam starts
- * (e.g. from a separate script loaded after this one). On exam start every
- * module's init(ctx) is called with:
- *     ctx.root      the element containing all questions
- *     ctx.exam      the exam (id, title, questions, settings)
- *     ctx.settings  exam.settings, reserved per-exam anti-cheat options
- *     ctx.log       function (type, detail) -> records an event
+ * A tiny registry; the actual guards live in exam_guard.js (page visibility,
+ * fullscreen, browser close). A guard module is an object with any of:
+ *     name
+ *     onUserStart()        synchronously inside the "Start" click (the only
+ *                          place requestFullscreen() is allowed)
+ *     init(ctx)            exam is rendered. ctx = { root, exam, settings,
+ *                          log(type, detail, atMs), beacon(type, detail),
+ *                          resumed, lastSeen, suspendBlur(), t(key) }
+ *     onBeforeSubmit()     close any open "episodes" so they are logged
+ *     onFinish()           exam submitted: clean up (leave fullscreen, ...)
  * Every question is a  <section data-question-id data-question-type>  and every
- * answer control has class "exam-input", so a module can listen on ctx.root
- * with event delegation (paste/copy/cut, focus, ...). Document-level things like
- * visibilitychange / window blur can be attached to document/window directly.
- * Logged events are sent with the submission, stored in the submission JSON
- * ("events") and listed on the teacher's submission page.
+ * answer control has class "exam-input", so a later module (e.g. anti-paste)
+ * can listen on ctx.root with event delegation.
+ * Events are {type, at (unix s), detail}. They are kept in the localStorage
+ * draft (so a reload does not erase them), sent with the final submission and
+ * shown in red on the teacher's submission page. "page_closed" is the one
+ * event sent immediately (navigator.sendBeacon, server timestamp) because the
+ * page is going away.
  */
 (function () {
     'use strict';
@@ -39,20 +42,61 @@
     // ------------------------------------------------------------------
     // Guard registry (see header comment)
     // ------------------------------------------------------------------
+    var settings = {};
+    try { settings = JSON.parse(app.dataset.settings || '{}') || {}; } catch (e) { settings = {}; }
+
     var Guard = window.MathubExamGuard = {
         events: [],
         modules: [],
+        settings: settings,
+        active: false,
         register: function (mod) { Guard.modules.push(mod); },
-        log: function (type, detail) {
-            Guard.events.push({ type: String(type), at: Math.floor(Date.now() / 1000), detail: detail === undefined ? null : detail });
+        log: function (type, detail, atMs) {
+            Guard.events.push({ type: String(type), at: Math.floor((atMs || Date.now()) / 1000), detail: detail === undefined ? null : detail });
+            saveDraftNow();
+        },
+        call: function (hook, arg) {
+            Guard.modules.forEach(function (m) {
+                if (typeof m[hook] !== 'function') { return; }
+                try { m[hook](arg); } catch (e) { /* a broken guard must never break the exam */ }
+            });
         },
         init: function (ctx) {
+            Guard.active = true;
             ctx.log = Guard.log;
-            Guard.modules.forEach(function (m) {
-                try { m.init(ctx); } catch (e) { /* a broken guard must never break the exam */ }
-            });
+            ctx.beacon = sendBeacon;
+            ctx.t = t;
+            ctx.suspendBlur = suspendBlur;
+            ctx.settings = settings;
+            Guard.call('init', ctx);
         }
     };
+
+    // Native dialogs (confirm, file picker) steal window focus; those must not
+    // count as "left the page". Modules read Guard.blurSuspended.
+    Guard.blurSuspended = false;
+    function suspendBlur(maxMs) {
+        Guard.blurSuspended = true;
+        var release = function () {
+            window.removeEventListener('focus', release);
+            setTimeout(function () { Guard.blurSuspended = false; window.dispatchEvent(new Event('mathub-guard-recheck')); }, 300);
+        };
+        window.addEventListener('focus', release);
+        // Safety net if focus never fires (some browsers don't blur at all).
+        setTimeout(release, maxMs || 60000);
+    }
+
+    function sendBeacon(type, detail) {
+        var fd = new FormData();
+        fd.append('csrf_token', app.dataset.csrf);
+        fd.append('type', type);
+        fd.append('detail', JSON.stringify(detail || null));
+        try {
+            if (!(navigator.sendBeacon && navigator.sendBeacon(app.dataset.eventUrl + encodeURIComponent(state.sid), fd))) {
+                fetch(app.dataset.eventUrl + encodeURIComponent(state.sid), { method: 'POST', body: fd, keepalive: true, credentials: 'same-origin' });
+            }
+        } catch (e) { /* nothing more we can do while the page is closing */ }
+    }
 
     // ------------------------------------------------------------------
     // State
@@ -79,11 +123,21 @@
         try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch (e) { return null; }
     }
     var saveTimer = null;
+    function writeDraft() {
+        if (!state.sid || state.done) { return; }
+        try {
+            localStorage.setItem(storageKey, JSON.stringify({
+                sid: state.sid, answers: state.answers, events: Guard.events, lastSeen: Date.now()
+            }));
+        } catch (e) { /* storage full/blocked: fine */ }
+    }
     function saveDraft() {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(function () {
-            try { localStorage.setItem(storageKey, JSON.stringify({ sid: state.sid, answers: state.answers })); } catch (e) { /* storage full/blocked: fine */ }
-        }, 300);
+        saveTimer = setTimeout(writeDraft, 300);
+    }
+    function saveDraftNow() {
+        clearTimeout(saveTimer);
+        writeDraft();
     }
     function clearDraft() {
         clearTimeout(saveTimer);
@@ -346,6 +400,7 @@
             info.textContent = f ? f.name : '';
             remove.hidden = !f;
         }
+        input.addEventListener('click', function () { suspendBlur(); });
         input.addEventListener('change', function () {
             var f = input.files[0];
             if (!f) { return; }
@@ -569,7 +624,8 @@
         startForm.hidden = true;
         main.hidden = false;
         window.scrollTo(0, 0);
-        Guard.init({ root: root, exam: state.exam, settings: state.exam.settings || {} });
+        Guard.init({ root: root, exam: state.exam, resumed: !!resumeInfo, lastSeen: resumeInfo ? resumeInfo.lastSeen : null });
+        resumeInfo = null;
     }
 
     // ------------------------------------------------------------------
@@ -579,6 +635,8 @@
         return fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (res) { return res.json().catch(function () { return { ok: false }; }); });
     }
+
+    var resumeInfo = null;
 
     function begin(data, resumed) {
         state.sid = data.submissionId;
@@ -603,6 +661,7 @@
     startForm.addEventListener('submit', function (e) {
         e.preventDefault();
         startError.hidden = true;
+        Guard.call('onUserStart'); // must run synchronously inside the click (fullscreen)
         var fd = new FormData(startForm);
         start(fd, null).catch(function () {
             startError.textContent = t('error_start');
@@ -612,9 +671,11 @@
 
     var draft = loadDraft();
     if (draft && draft.sid) {
+        resumeInfo = { lastSeen: draft.lastSeen || null };
+        if (Array.isArray(draft.events)) { Guard.events = draft.events; }
         var fd = new FormData();
         fd.append('resume', draft.sid);
-        start(fd, draft.answers || {}).catch(function () { clearDraft(); });
+        start(fd, draft.answers || {}).catch(function () { clearDraft(); resumeInfo = null; Guard.events = []; });
     }
 
     // ------------------------------------------------------------------
@@ -623,7 +684,9 @@
     function submitExam(button, errorBox) {
         if (state.submitting) { return; }
         var unanswered = state.exam.questions.filter(function (q) { return !isAnswered(q); }).length;
+        suspendBlur(500); // confirm() blocks JS, so this fires right after it closes
         if (!confirm(unanswered ? t('unanswered') : t('confirm_submit'))) { return; }
+        Guard.call('onBeforeSubmit');
 
         state.submitting = true;
         button.disabled = true;
@@ -639,6 +702,8 @@
         postForm(app.dataset.submitUrl + encodeURIComponent(state.sid), fd).then(function (data) {
             if (!data.ok) { throw new Error(data.error || 'submit'); }
             state.done = true;
+            Guard.active = false;
+            Guard.call('onFinish');
             clearDraft();
             main.innerHTML = '';
             main.appendChild(el('div', { class: 'exam-done' }, [
@@ -653,6 +718,10 @@
             errorBox.hidden = false;
         });
     }
+
+    // Heartbeat so a reopened exam can tell how long the browser was gone,
+    // even if it was killed without any event.
+    setInterval(function () { if (state.exam && !state.done) { writeDraft(); } }, 3000);
 
     window.addEventListener('beforeunload', function (e) {
         if (state.exam && !state.done) {

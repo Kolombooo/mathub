@@ -407,3 +407,13 @@ button.small { padding: 0.2rem 0.55rem; }
 .q.review label.score { margin: 0.7rem 0 0; font-weight: normal; }
 .q.review input[type=number] { width: 6rem; }
 .total { font-size: 1.1rem; }
+
+/* ---------- Anti-cheating ---------- */
+.flag, .flag-summary { color: #dc2626; font-weight: 600; }
+.event-log li { padding: 0.15rem 0; }
+.event-log li.flag { color: #dc2626; }
+.notice { font-size: 0.9rem; color: var(--muted); }
+fieldset.settings { border: 1px solid var(--border); border-radius: var(--radius); margin: 1rem 0; padding: 0.6rem 1rem; background: var(--card-bg); }
+fieldset.settings legend { font-weight: 600; padding: 0 0.4rem; }
+.fs-overlay { position: fixed; inset: 0; z-index: 20000; background: rgba(17, 24, 39, 0.96); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.fs-box { background: #fff; border-radius: var(--radius); padding: 1.5rem 2rem; max-width: 460px; text-align: center; }
