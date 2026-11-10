@@ -25,7 +25,7 @@
     "exam.submitted_text": "Vaše odpovědi byly odevzdány. Tuto stránku můžete zavřít.",
     "exam.points": "b.",
     "exam.select_placeholder": "— vyberte —",
-    "exam.match_hint": "Přiřaďte ke každé položce vlevo jednu položku vpravo.",
+    "exam.match_hint": "Spojte každou položku vlevo s jednou vpravo: táhněte od tečky, nebo klikněte na položku a pak na její protějšek. Kliknutím na čáru ji odstraníte.",
     "exam.file_choose": "Vybrat soubor",
     "exam.file_remove": "Odebrat",
     "exam.file_too_large": "Soubor je příliš velký (max. 10 MB).",
@@ -38,5 +38,10 @@
     "exam.error_start": "Test se nepodařilo zahájit. Zkuste to prosím znovu.",
     "exam.error_submit": "Odevzdání selhalo. Vaše odpovědi zde zůstávají — zkontrolujte připojení a zkuste to znovu.",
     "exam.resumed": "Vítejte zpět, vaše předchozí odpovědi byly obnoveny.",
-    "exam.number_placeholder": "Číslo"
+    "exam.number_placeholder": "Číslo",
+    "exam.draw_pen": "Pero",
+    "exam.draw_eraser": "Guma",
+    "exam.draw_text": "Text",
+    "exam.draw_select": "Výběr",
+    "exam.draw_delete": "Smazat vybrané"
 }

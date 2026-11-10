@@ -58,7 +58,7 @@ Teachers (admin → class → *Exams*):
   (controls the tab names and the student UI language)
 - Build exams with these question types: radio, checkbox, select, short
   text, number, long text, connect A to B (shuffled per student), file
-  upload, draw (Signature Pad, vendored in `public/assets/vendor`)
+  upload, draw (Fabric.js, vendored in `public/assets/vendor`: pen, eraser, text boxes, colours, widths)
 - Optional correct answers (several accepted); matching gives partial credit.
   Long text, upload, draw and questions without a correct answer are scored
   by hand

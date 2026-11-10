@@ -26,5 +26,5 @@
 </div>
 
 <script type="application/json" id="exam-i18n"><?= json_encode($i18n, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
-<script src="<?= View::e(View::asset('/assets/vendor/signature_pad.umd.min.js')) ?>"></script>
+<script src="<?= View::e(View::asset('/assets/vendor/fabric.min.js')) ?>"></script>
 <script src="<?= View::e(View::asset('/assets/exam.js')) ?>"></script>

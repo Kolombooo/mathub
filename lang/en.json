@@ -25,7 +25,7 @@
     "exam.submitted_text": "Your answers have been submitted. You can close this page.",
     "exam.points": "pts",
     "exam.select_placeholder": "— choose —",
-    "exam.match_hint": "Match every item on the left with one on the right.",
+    "exam.match_hint": "Connect each item on the left to one on the right: drag from a dot, or click an item and then its partner. Click a line to remove it.",
     "exam.file_choose": "Choose a file",
     "exam.file_remove": "Remove",
     "exam.file_too_large": "The file is too large (max 10 MB).",
@@ -38,5 +38,10 @@
     "exam.error_start": "Could not start the exam. Please try again.",
     "exam.error_submit": "Submitting failed. Your answers are still here — check your connection and try again.",
     "exam.resumed": "Welcome back, your previous answers were restored.",
-    "exam.number_placeholder": "Number"
+    "exam.number_placeholder": "Number",
+    "exam.draw_pen": "Pen",
+    "exam.draw_eraser": "Eraser",
+    "exam.draw_text": "Text",
+    "exam.draw_select": "Select",
+    "exam.draw_delete": "Delete selected"
 }
