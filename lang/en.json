@@ -47,5 +47,7 @@
     "exam.monitor_notice": "While the exam is open, leaving the page or fullscreen and closing the browser are recorded and shown to your teacher.",
     "exam.fs_title": "Fullscreen required",
     "exam.fs_text": "Return to fullscreen to continue the exam. Leaving fullscreen is recorded.",
-    "exam.fs_button": "Continue in fullscreen"
+    "exam.fs_button": "Continue in fullscreen",
+    "exam.dialog_ok": "OK",
+    "exam.dialog_cancel": "Cancel"
 }

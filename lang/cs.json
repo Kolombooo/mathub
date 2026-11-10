@@ -47,5 +47,7 @@
     "exam.monitor_notice": "Během testu se zaznamenává opuštění stránky nebo celé obrazovky a zavření prohlížeče; záznam uvidí učitel.",
     "exam.fs_title": "Vyžadován celoobrazovkový režim",
     "exam.fs_text": "Pro pokračování v testu se vraťte na celou obrazovku. Opuštění celé obrazovky se zaznamenává.",
-    "exam.fs_button": "Pokračovat na celé obrazovce"
+    "exam.fs_button": "Pokračovat na celé obrazovce",
+    "exam.dialog_ok": "OK",
+    "exam.dialog_cancel": "Zrušit"
 }
