@@ -87,7 +87,10 @@ if (count($decoded) === 6 && $decoded[5] === 'save' && $method === 'POST') {
     requireCsrf();
     $questions = json_decode((string)($_POST['questions'] ?? '[]'), true);
     try {
-        Exams::saveExam($classSlug, $examId, (string)($_POST['title'] ?? ''), !empty($_POST['published']), is_array($questions) ? $questions : []);
+        Exams::saveExam($classSlug, $examId, (string)($_POST['title'] ?? ''), !empty($_POST['published']), is_array($questions) ? $questions : [], [
+            'monitor' => !empty($_POST['monitor']),
+            'fullscreen' => !empty($_POST['fullscreen']),
+        ]);
         flash('success', 'Exam saved.');
     } catch (StorageException $e) {
         flash('error', $e->getMessage());

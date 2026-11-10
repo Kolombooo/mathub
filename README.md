@@ -71,9 +71,21 @@ localStorage draft for refresh recovery) and sent in a single request at the
 end. Exam data lives in `data/exams/<class>/<exam>/` (not in `content/`, so it
 is not mistaken for topics).
 
-Anti-cheating is prepared but not implemented: see the `MathubExamGuard`
-comment at the top of `public/assets/exam.js`, the reserved per-exam
-`settings`, and the stored `events` list shown on the submission page.
+Anti-cheating (per exam, two checkboxes in the exam editor; students are told
+when monitoring is on). Implemented in `public/assets/exam_guard.js` on top of
+the `MathubExamGuard` registry in `exam.js`:
+
+- leaving the page (Page Visibility API + window blur: tab switch, new window,
+  alt-tab) is logged with the time and how long the student was away
+- the exam starts in fullscreen; leaving it logs the time and duration and
+  blocks the exam behind an overlay until the student returns. Fullscreen is
+  released on submit
+- closing or reloading the page is reported immediately to the server
+  (`sendBeacon`, server time); reopening logs how long the browser was gone
+
+Flagged events are shown in red on the submissions list and the submission
+page. Developer-tools detection is intentionally not implemented (there is no
+reliable browser API for it).
 
 ## Data layout
 

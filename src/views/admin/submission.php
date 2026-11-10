@@ -41,7 +41,7 @@ $pairById = function (array $q, string $id): ?array {
 </p>
 
 <?php if ($working): ?>
-    <p class="empty">The student has not submitted yet; answers appear here once they do.</p>
+    <p class="empty">The student has not submitted yet; answers appear here once they do. The activity log below updates when you reload.</p>
 <?php else: ?>
 <form method="post" action="<?= $subBase ?>/save">
     <?= Csrf::field() ?>
@@ -129,14 +129,19 @@ $pairById = function (array $q, string $id): ?array {
     </div>
 </form>
 
+<?php endif; ?>
+
+<?php $flags = Exams::flagSummary($sub); ?>
 <?php if (!empty($sub['events'])): ?>
     <h2>Activity log</h2>
-    <ul class="plain muted">
-        <?php foreach ($sub['events'] as $e): ?>
-            <li><?= date('H:i:s', (int)$e['at']) ?> &middot; <?= View::e($e['type']) ?> <?= $e['detail'] !== 'null' ? View::e($e['detail']) : '' ?></li>
+    <?php if ($flags['count']): ?>
+        <p class="flag-summary"><?= $flags['count'] ?> flagged event<?= $flags['count'] === 1 ? '' : 's' ?><?= $flags['awaySec'] ? ' &middot; ' . sprintf('%d:%02d', intdiv($flags['awaySec'], 60), $flags['awaySec'] % 60) . ' away from the page' : '' ?></p>
+    <?php endif; ?>
+    <ul class="plain event-log">
+        <?php foreach ($sub['events'] as $e): [$label, $flagged] = Exams::describeEvent($e); ?>
+            <li class="<?= $flagged ? 'flag' : 'muted' ?>"><?= date('H:i:s', (int)$e['at']) ?> &middot; <?= View::e($label) ?></li>
         <?php endforeach; ?>
     </ul>
-<?php endif; ?>
 <?php endif; ?>
 
 <form method="post" action="<?= $subBase ?>/delete" onsubmit="return confirm('Delete this submission permanently?');" style="margin-top:2rem;">

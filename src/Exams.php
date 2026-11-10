@@ -4,6 +4,12 @@ final class Exams
 {
     public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'upload', 'draw'];
 
+    /** Event types the teacher should see in red. */
+    public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened'];
+    /** Events the browser may report on its own while the page is going away. */
+    public const BEACON_TYPES = ['page_closed'];
+    public const DEFAULT_SETTINGS = ['monitor' => true, 'fullscreen' => true];
+
     public const MAX_FILE_BYTES = 10 * 1024 * 1024;
     private const UPLOAD_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'zip'];
     private const INLINE_IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
@@ -103,7 +109,12 @@ final class Exams
         return $id;
     }
 
-    public static function saveExam(string $classSlug, string $examId, string $title, bool $published, array $rawQuestions): void
+    public static function settingsOf(array $exam): array
+    {
+        return array_merge(self::DEFAULT_SETTINGS, array_intersect_key((array)($exam['settings'] ?? []), self::DEFAULT_SETTINGS));
+    }
+
+    public static function saveExam(string $classSlug, string $examId, string $title, bool $published, array $rawQuestions, array $settings = []): void
     {
         $exam = self::getExam($classSlug, $examId);
         if ($exam === null) {
@@ -116,6 +127,10 @@ final class Exams
         $exam['title'] = $title;
         $exam['published'] = $published;
         $exam['questions'] = self::normalizeQuestions($rawQuestions);
+        $exam['settings'] = [
+            'monitor' => !empty($settings['monitor']),
+            'fullscreen' => !empty($settings['fullscreen']),
+        ];
         self::writeJson(self::examDir($classSlug, $examId) . '/exam.json', $exam);
     }
 
@@ -226,7 +241,7 @@ final class Exams
             }
             $questions[] = $p;
         }
-        return ['id' => $exam['id'], 'title' => $exam['title'], 'questions' => $questions, 'settings' => (object)($exam['settings'] ?? [])];
+        return ['id' => $exam['id'], 'title' => $exam['title'], 'questions' => $questions, 'settings' => self::settingsOf($exam)];
     }
 
     public static function maxScore(array $exam): float
@@ -351,8 +366,66 @@ final class Exams
         $sub['status'] = 'submitted';
         $sub['submittedAt'] = $now;
         $sub['durationSec'] = max(0, $now - (int)$sub['startedAt']);
-        $sub['events'] = self::cleanEvents($payload['events'] ?? []);
+        // Keep server-recorded events (page_closed beacons) and add the client's.
+        $events = array_merge((array)($sub['events'] ?? []), self::cleanEvents($payload['events'] ?? []));
+        usort($events, fn($a, $b) => $a['at'] <=> $b['at']);
+        $sub['events'] = array_slice($events, 0, 1000);
         self::saveSubmission($classSlug, $examId, $sub);
+    }
+
+    /** Records an event reported by the browser as the page closes (server time). */
+    public static function addBeaconEvent(string $classSlug, string $examId, string $sid, string $type, $detail): void
+    {
+        $sub = self::getSubmission($classSlug, $examId, $sid);
+        if ($sub === null || $sub['status'] !== 'working' || !in_array($type, self::BEACON_TYPES, true)) {
+            return;
+        }
+        $events = (array)($sub['events'] ?? []);
+        if (count($events) >= 1000) {
+            return;
+        }
+        $events[] = ['type' => $type, 'at' => time(), 'detail' => mb_substr(json_encode($detail), 0, 500)];
+        $sub['events'] = $events;
+        self::saveSubmission($classSlug, $examId, $sub);
+    }
+
+    /** @return array{count:int, awaySec:int} red-flag summary for a submission */
+    public static function flagSummary(array $sub): array
+    {
+        $count = 0;
+        $away = 0;
+        foreach ((array)($sub['events'] ?? []) as $e) {
+            if (!in_array($e['type'], self::FLAG_TYPES, true)) {
+                continue;
+            }
+            $count++;
+            if ($e['type'] === 'left_page') {
+                $d = json_decode((string)$e['detail'], true);
+                $away += (int)($d['durationSec'] ?? 0);
+            }
+        }
+        return ['count' => $count, 'awaySec' => $away];
+    }
+
+    /** Human-readable line for the teacher: [label, isFlagged]. */
+    public static function describeEvent(array $e): array
+    {
+        $d = json_decode((string)($e['detail'] ?? ''), true) ?: [];
+        $dur = isset($d['durationSec']) ? sprintf('%d:%02d', intdiv((int)$d['durationSec'], 60), (int)$d['durationSec'] % 60) : null;
+        switch ($e['type']) {
+            case 'left_page':
+                $how = ($d['reason'] ?? '') === 'hidden' ? 'tab switched / window minimised' : 'window lost focus';
+                return ['Left the exam page (' . $how . ') for ' . ($dur ?? '?'), true];
+            case 'fullscreen_exit':
+                return ['Exited fullscreen for ' . ($dur ?? '?'), true];
+            case 'page_closed':
+                return ['Closed or reloaded the page / browser', true];
+            case 'page_reopened':
+                return ['Reopened the exam after being gone ' . ($dur ?? '?'), true];
+            case 'fullscreen_unsupported':
+                return ['Browser does not support fullscreen', false];
+        }
+        return [$e['type'], false];
     }
 
     private static function cleanEvents($events): array
