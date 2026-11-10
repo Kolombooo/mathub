@@ -61,18 +61,29 @@ if ($method === 'GET' && $path === '/') {
     exit;
 }
 
+require dirname(__DIR__) . '/src/routes/exams_public.php';
+
 if ($method === 'GET' && count($decoded) === 2 && $decoded[0] === 'class') {
     $classSlug = $decoded[1];
     $classTitle = Storage::getClassTitle($classSlug);
     if ($classTitle === null) {
         notFound();
     }
+    $tab = ($_GET['tab'] ?? '') === 'exams' ? 'exams' : 'topics';
+    $unlocked = examsUnlocked($classSlug);
+    $codeError = !empty($_SESSION['exams_code_error']);
+    unset($_SESSION['exams_code_error']);
     View::render('class', [
         'title' => $classTitle,
-        'lang' => I18n::defaultLang(),
+        'lang' => Storage::getClassLang($classSlug),
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'topics' => Storage::listTopics($classSlug),
+        'tab' => $tab,
+        'examsEnabled' => Storage::getClassCode($classSlug) !== '',
+        'unlocked' => $unlocked,
+        'codeError' => $codeError,
+        'exams' => $tab === 'exams' && $unlocked ? Exams::listExams($classSlug, true) : [],
     ]);
     exit;
 }
@@ -424,5 +435,7 @@ if (count($decoded) === 8 && $decoded[5] === 'uploads' && $decoded[7] === 'delet
     flash('success', 'File deleted.');
     redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug));
 }
+
+require dirname(__DIR__) . '/src/routes/exams_admin.php';
 
 notFound();

@@ -65,4 +65,11 @@ final class I18n
         }
         return $key;
     }
+
+    /** All strings whose key starts with $prefix (English fallback merged in). */
+    public static function group(string $code, string $prefix): array
+    {
+        $merged = array_merge(self::load(self::DEFAULT_LANG), self::load($code));
+        return array_filter($merged, fn($k) => strpos($k, $prefix) === 0, ARRAY_FILTER_USE_KEY);
+    }
 }
