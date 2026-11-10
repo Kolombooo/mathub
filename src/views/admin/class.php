@@ -1,6 +1,20 @@
 <p class="breadcrumbs"><a href="/admin">Admin</a></p>
 <h1><?= View::e($classTitle) ?> &middot; Topics</h1>
 
+<p>
+    <a href="/admin/classes/<?= rawurlencode($classSlug) ?>/exams" class="button">Exams</a>
+</p>
+<form method="post" action="/admin/classes/<?= rawurlencode($classSlug) ?>/language" class="inline-form form-add">
+    <?= Csrf::field() ?>
+    <label for="class-lang" style="display:inline;font-weight:normal;">Class page &amp; exam language:</label>
+    <select name="lang" id="class-lang" onchange="this.form.submit()">
+        <?php foreach (I18n::available() as $language): ?>
+            <option value="<?= View::e($language['code']) ?>" <?= $language['code'] === Storage::getClassLang($classSlug) ? 'selected' : '' ?>><?= View::e($language['name']) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <noscript><button type="submit">Set</button></noscript>
+</form>
+
 <form method="post" action="/admin/classes/<?= rawurlencode($classSlug) ?>/topics" class="inline-form form-add">
     <?= Csrf::field() ?>
     <input type="text" name="title" placeholder="New topic name" required>

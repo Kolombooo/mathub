@@ -3,4 +3,4 @@
 /content/*
 !/content/.htaccess
 .idea/
-.claude
+.claude/data/exams/

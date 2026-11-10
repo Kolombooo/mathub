@@ -46,6 +46,35 @@ From the admin panel you can:
 - Reorder materials within a topic
 - Manage uploaded files per topic
 
+## Exams
+
+Each class has an **Exams** tab (**Testy** in Czech) on its public page.
+Students have no accounts: they enter the class code, pick an exam and type
+their name and surname.
+
+Teachers (admin → class → *Exams*):
+
+- Set the class code (empty = exams locked) and the class language
+  (controls the tab names and the student UI language)
+- Build exams with these question types: radio, checkbox, select, short
+  text, number, long text, connect A to B (shuffled per student), file
+  upload, draw (Signature Pad, vendored in `public/assets/vendor`)
+- Optional correct answers (several accepted); matching gives partial credit.
+  Long text, upload, draw and questions without a correct answer are scored
+  by hand
+- See who is still working and who submitted (with time taken), open a
+  submission, edit scores, comment and mark it as *Marked*. Students never see
+  scores.
+
+The exam is one page: loaded once, answers kept in the browser (plus a
+localStorage draft for refresh recovery) and sent in a single request at the
+end. Exam data lives in `data/exams/<class>/<exam>/` (not in `content/`, so it
+is not mistaken for topics).
+
+Anti-cheating is prepared but not implemented: see the `MathubExamGuard`
+comment at the top of `public/assets/exam.js`, the reserved per-exam
+`settings`, and the stored `events` list shown on the submission page.
+
 ## Data layout
 
 Everything is stored as plain files under `content/`:
