@@ -1,4 +1,5 @@
 <h1>Admin &middot; Classes</h1>
+<p><a href="/admin/exam-contents" class="button">Exam content library</a></p>
 
 <form method="post" action="/admin/classes" class="inline-form form-add">
     <?= Csrf::field() ?>

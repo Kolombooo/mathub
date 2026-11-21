@@ -57,7 +57,134 @@ final class Exams
         file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
     }
 
+    // ---------- Exam content (the teacher's question library) ----------
+    //
+    // An ExamContent is a titled series of questions stored once in
+    // data/exam_contents/<id>.json. An Exam (below) points at exactly one.
+
+    private static function contentsDir(): string
+    {
+        return Config::dataDir() . '/exam_contents';
+    }
+
+    public static function listContents(): array
+    {
+        $out = [];
+        foreach (glob(self::contentsDir() . '/*.json') ?: [] as $file) {
+            $c = self::readJson($file);
+            if ($c !== null && isset($c['id'])) {
+                $c['questions'] = (array)($c['questions'] ?? []);
+                $out[] = $c;
+            }
+        }
+        usort($out, fn($a, $b) => strcasecmp($a['title'] ?? '', $b['title'] ?? ''));
+        return $out;
+    }
+
+    public static function getContent(string $id): ?array
+    {
+        if (!self::validId($id)) {
+            return null;
+        }
+        $c = self::readJson(self::contentsDir() . '/' . $id . '.json');
+        if ($c !== null) {
+            $c['questions'] = (array)($c['questions'] ?? []);
+        }
+        return $c;
+    }
+
+    public static function createContent(string $title, array $questions = []): string
+    {
+        $title = trim($title);
+        if ($title === '') {
+            throw new StorageException('Exam content title cannot be empty.');
+        }
+        $base = Storage::slugify($title);
+        $id = $base;
+        $i = 2;
+        while (is_file(self::contentsDir() . '/' . $id . '.json')) {
+            $id = $base . '-' . $i++;
+        }
+        self::writeJson(self::contentsDir() . '/' . $id . '.json', [
+            'id' => $id,
+            'title' => mb_substr($title, 0, 200),
+            'createdAt' => time(),
+            'updatedAt' => time(),
+            'questions' => $questions,
+        ]);
+        return $id;
+    }
+
+    public static function saveContent(string $id, string $title, array $rawQuestions): void
+    {
+        $c = self::getContent($id);
+        if ($c === null) {
+            throw new StorageException('Exam content not found.');
+        }
+        $title = trim($title);
+        if ($title === '') {
+            throw new StorageException('Exam content title cannot be empty.');
+        }
+        $c['title'] = mb_substr($title, 0, 200);
+        $c['questions'] = self::normalizeQuestions($rawQuestions);
+        $c['updatedAt'] = time();
+        self::writeJson(self::contentsDir() . '/' . $id . '.json', $c);
+    }
+
+    /** Exams (any class) that use this content. */
+    public static function contentUsage(string $contentId): array
+    {
+        return array_values(array_filter(self::allExams(), fn($e) => ($e['contentId'] ?? null) === $contentId));
+    }
+
+    public static function deleteContent(string $id): void
+    {
+        if (!self::validId($id) || self::getContent($id) === null) {
+            return;
+        }
+        if (self::contentUsage($id)) {
+            throw new StorageException('This exam content is used by an exam. Detach or delete those exams first.');
+        }
+        @unlink(self::contentsDir() . '/' . $id . '.json');
+    }
+
+    public static function contentMaxScore(array $content): float
+    {
+        return array_sum(array_map(fn($q) => (float)$q['points'], $content['questions']));
+    }
+
     // ---------- Exams ----------
+    //
+    // An Exam lives in one lesson (a material: class + topic + material) and
+    // has its own code. Students enter the code, then their name. The questions
+    // come from exactly one ExamContent (`contentId`). Submissions and uploaded
+    // files stay in the exam's folder.
+
+    /** Raw exam.json as stored (no content merged in). */
+    private static function rawExam(string $classSlug, string $examId): ?array
+    {
+        $dir = self::examDir($classSlug, $examId);
+        return $dir === null ? null : self::readJson($dir . '/exam.json');
+    }
+
+    /**
+     * Merges the exam's content into it, so callers can keep using
+     * $exam['questions']. Exams not yet migrated fall back to their own
+     * embedded questions (read-only), so old data keeps working.
+     */
+    private static function hydrate(array $exam, string $classSlug): array
+    {
+        $exam['classSlug'] = $classSlug;
+        if (!empty($exam['contentId'])) {
+            $content = self::getContent((string)$exam['contentId']);
+            $exam['questions'] = $content['questions'] ?? [];
+            $exam['contentTitle'] = $content['title'] ?? null;
+        } else {
+            $exam['questions'] = (array)($exam['questions'] ?? []);
+            $exam['contentTitle'] = null;
+        }
+        return $exam;
+    }
 
     public static function listExams(string $classSlug, bool $publishedOnly = false): array
     {
@@ -79,17 +206,88 @@ final class Exams
         return $out;
     }
 
-    public static function getExam(string $classSlug, string $examId): ?array
+    /** Every exam of every class. */
+    public static function allExams(): array
     {
-        $dir = self::examDir($classSlug, $examId);
-        return $dir === null ? null : self::readJson($dir . '/exam.json');
+        $root = Config::dataDir() . '/exams';
+        $out = [];
+        foreach (is_dir($root) ? scandir($root) : [] as $entry) {
+            if ($entry !== '.' && $entry !== '..' && self::validId($entry) && is_dir($root . '/' . $entry)) {
+                $out = array_merge($out, self::listExams($entry));
+            }
+        }
+        return $out;
     }
 
-    public static function createExam(string $classSlug, string $title): string
+    public static function getExam(string $classSlug, string $examId): ?array
+    {
+        $exam = self::rawExam($classSlug, $examId);
+        return $exam === null ? null : self::hydrate($exam, $classSlug);
+    }
+
+    public static function normalizeCode(string $code): string
+    {
+        return strtoupper(preg_replace('/\s+/', '', trim($code)));
+    }
+
+    public static function generateCode(): string
+    {
+        // Unambiguous characters only (no 0/O, 1/I/L).
+        $alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        do {
+            $code = '';
+            for ($i = 0; $i < 6; $i++) {
+                $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+        } while (self::findByCode($code) !== null);
+        return $code;
+    }
+
+    /** Finds the exam a code belongs to (case-insensitive), whether published or not. */
+    public static function findByCode(string $code): ?array
+    {
+        $code = self::normalizeCode($code);
+        if ($code === '') {
+            return null;
+        }
+        foreach (self::allExams() as $exam) {
+            if (self::normalizeCode((string)($exam['code'] ?? '')) === $code) {
+                return $exam;
+            }
+        }
+        return null;
+    }
+
+    /** Published exams attached to a lesson. */
+    public static function examsForLesson(string $classSlug, string $topicSlug, string $materialSlug): array
+    {
+        return array_values(array_filter(
+            self::listExams($classSlug, true),
+            fn($e) => ($e['topic'] ?? null) === $topicSlug && ($e['material'] ?? null) === $materialSlug
+        ));
+    }
+
+    /** "topic/material" as posted by the lesson <select>; returns [topic, material] or null. */
+    public static function parseLesson(string $classSlug, string $value): ?array
+    {
+        $parts = explode('/', $value);
+        if (count($parts) !== 2 || !Storage::materialExists($classSlug, $parts[0], $parts[1])) {
+            return null;
+        }
+        return $parts;
+    }
+
+    public static function createExam(string $classSlug, string $title, ?array $lesson, ?string $contentId): string
     {
         $title = trim($title);
         if ($title === '') {
             throw new StorageException('Exam title cannot be empty.');
+        }
+        if ($lesson === null) {
+            throw new StorageException('Choose the lesson this exam belongs to.');
+        }
+        if ($contentId !== null && $contentId !== '' && self::getContent($contentId) === null) {
+            throw new StorageException('Exam content not found.');
         }
         $base = Storage::slugify($title);
         $id = $base;
@@ -102,8 +300,10 @@ final class Exams
             'title' => $title,
             'published' => false,
             'createdAt' => time(),
-            'questions' => [],
-            // Reserved for anti-cheating options (see assets/exam.js "Guard").
+            'topic' => $lesson[0],
+            'material' => $lesson[1],
+            'contentId' => $contentId !== '' ? $contentId : null,
+            'code' => self::generateCode(),
             'settings' => new stdClass(),
         ]);
         return $id;
@@ -114,9 +314,18 @@ final class Exams
         return array_merge(self::DEFAULT_SETTINGS, array_intersect_key((array)($exam['settings'] ?? []), self::DEFAULT_SETTINGS));
     }
 
-    public static function saveExam(string $classSlug, string $examId, string $title, bool $published, array $rawQuestions, array $settings = []): void
+    public static function submissionCount(string $classSlug, string $examId): int
     {
-        $exam = self::getExam($classSlug, $examId);
+        return count(self::listSubmissions($classSlug, $examId));
+    }
+
+    /**
+     * Updates an exam's own settings. Questions are NOT edited here: they
+     * belong to the exam content.
+     */
+    public static function saveExam(string $classSlug, string $examId, string $title, bool $published, array $settings, ?array $lesson, string $contentId, string $code): void
+    {
+        $exam = self::rawExam($classSlug, $examId);
         if ($exam === null) {
             throw new StorageException('Exam not found.');
         }
@@ -124,9 +333,33 @@ final class Exams
         if ($title === '') {
             throw new StorageException('Exam title cannot be empty.');
         }
+        if ($lesson === null) {
+            throw new StorageException('Choose the lesson this exam belongs to.');
+        }
+        $code = self::normalizeCode($code);
+        if (mb_strlen($code) < 4 || mb_strlen($code) > 40) {
+            throw new StorageException('The exam code must be 4 to 40 characters.');
+        }
+        $owner = self::findByCode($code);
+        if ($owner !== null && !($owner['classSlug'] === $classSlug && $owner['id'] === $examId)) {
+            throw new StorageException('That code is already used by another exam.');
+        }
+        if ($contentId !== '' && self::getContent($contentId) === null) {
+            throw new StorageException('Exam content not found.');
+        }
+        $newContent = $contentId !== '' ? $contentId : null;
+        if ($newContent !== ($exam['contentId'] ?? null) && !empty($exam['contentId']) && self::submissionCount($classSlug, $examId) > 0) {
+            throw new StorageException('This exam already has submissions, so its content cannot be changed. Create a new exam instead.');
+        }
+        if ($published && $newContent === null) {
+            throw new StorageException('Select an exam content before publishing.');
+        }
         $exam['title'] = $title;
         $exam['published'] = $published;
-        $exam['questions'] = self::normalizeQuestions($rawQuestions);
+        $exam['topic'] = $lesson[0];
+        $exam['material'] = $lesson[1];
+        $exam['contentId'] = $newContent;
+        $exam['code'] = $code;
         $exam['settings'] = [
             'monitor' => !empty($settings['monitor']),
             'fullscreen' => !empty($settings['fullscreen']),
@@ -147,6 +380,52 @@ final class Exams
         if (self::validId($classSlug)) {
             self::rrmdir(self::classDir($classSlug));
         }
+    }
+
+    // ---------- Migration from the old "questions embedded in the exam" layout ----------
+
+    /**
+     * One-off, idempotent and non-destructive. Every exam that still carries
+     * its own questions gets an ExamContent made from them (question ids are
+     * kept, so existing answers and scores stay valid) and a code of its own.
+     * The embedded `questions` stay in exam.json untouched and nothing is ever
+     * deleted. A marker file stops it from re-running.
+     */
+    public static function migrate(): void
+    {
+        $marker = Config::dataDir() . '/.exam_architecture_v2';
+        if (is_file($marker)) {
+            return;
+        }
+        $root = Config::dataDir() . '/exams';
+        foreach (is_dir($root) ? scandir($root) : [] as $classSlug) {
+            if ($classSlug === '.' || $classSlug === '..' || !self::validId($classSlug) || !is_dir($root . '/' . $classSlug)) {
+                continue;
+            }
+            foreach (scandir($root . '/' . $classSlug) as $examId) {
+                $exam = self::validId($examId) ? self::rawExam($classSlug, $examId) : null;
+                if ($exam === null) {
+                    continue;
+                }
+                $changed = false;
+                if (empty($exam['contentId']) && is_array($exam['questions'] ?? null)) {
+                    $exam['contentId'] = self::createContent((string)($exam['title'] ?? $examId), $exam['questions']);
+                    $changed = true;
+                }
+                if (empty($exam['code'])) {
+                    $exam['code'] = self::generateCode();
+                    $changed = true;
+                }
+                if ($changed) {
+                    // Content is already on disk before the exam points at it.
+                    self::writeJson(self::examDir($classSlug, $examId) . '/exam.json', $exam);
+                }
+            }
+        }
+        if (!is_dir(Config::dataDir())) {
+            mkdir(Config::dataDir(), 0775, true);
+        }
+        file_put_contents($marker, date('c'));
     }
 
     /** Sanitises question definitions coming from the teacher's editor. */

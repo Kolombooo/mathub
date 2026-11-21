@@ -7,6 +7,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 View::init(dirname(__DIR__) . '/src/views');
 Auth::ensureUserExists();
+Exams::migrate();
 
 function flash(string $type, string $message): void
 {
@@ -57,7 +58,9 @@ $decoded = array_map('rawurldecode', $segments);
 
 if ($method === 'GET' && $path === '/') {
     $lang = I18n::defaultLang();
-    View::render('home', ['title' => I18n::t($lang, 'breadcrumb.classes'), 'lang' => $lang, 'classes' => Storage::listClasses()]);
+    $codeError = !empty($_SESSION['exams_code_error']);
+    unset($_SESSION['exams_code_error']);
+    View::render('home', ['title' => I18n::t($lang, 'breadcrumb.classes'), 'lang' => $lang, 'classes' => Storage::listClasses(), 'codeError' => $codeError]);
     exit;
 }
 
@@ -69,21 +72,12 @@ if ($method === 'GET' && count($decoded) === 2 && $decoded[0] === 'class') {
     if ($classTitle === null) {
         notFound();
     }
-    $tab = ($_GET['tab'] ?? '') === 'exams' ? 'exams' : 'topics';
-    $unlocked = examsUnlocked($classSlug);
-    $codeError = !empty($_SESSION['exams_code_error']);
-    unset($_SESSION['exams_code_error']);
     View::render('class', [
         'title' => $classTitle,
         'lang' => Storage::getClassLang($classSlug),
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'topics' => Storage::listTopics($classSlug),
-        'tab' => $tab,
-        'examsEnabled' => Storage::getClassCode($classSlug) !== '',
-        'unlocked' => $unlocked,
-        'codeError' => $codeError,
-        'exams' => $tab === 'exams' && $unlocked ? Exams::listExams($classSlug, true) : [],
     ]);
     exit;
 }
@@ -116,7 +110,12 @@ if ($method === 'GET' && count($decoded) === 4 && $decoded[0] === 'class') {
         notFound();
     }
     $html = Markdown::toHtml($content);
+    $codeError = !empty($_SESSION['exams_code_error']);
+    unset($_SESSION['exams_code_error']);
     View::render('material', [
+        'materialSlug' => $materialSlug,
+        'hasExam' => Exams::examsForLesson($classSlug, $topicSlug, $materialSlug) !== [],
+        'codeError' => $codeError,
         'title' => Storage::getMaterialTitle($classSlug, $topicSlug, $materialSlug),
         'bodyClass' => 'page-material',
         'lang' => Storage::getTopicLang($classSlug, $topicSlug),
@@ -436,6 +435,7 @@ if (count($decoded) === 8 && $decoded[5] === 'uploads' && $decoded[7] === 'delet
     redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug));
 }
 
+require dirname(__DIR__) . '/src/routes/exam_contents_admin.php';
 require dirname(__DIR__) . '/src/routes/exams_admin.php';
 
 notFound();

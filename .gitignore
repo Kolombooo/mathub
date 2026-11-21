@@ -4,3 +4,5 @@
 !/content/.htaccess
 .idea/
 .claude/data/exams/
+/data/exam_contents/
+/data/.exam_architecture_v2

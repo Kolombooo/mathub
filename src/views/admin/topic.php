@@ -35,6 +35,7 @@
                         <input type="hidden" name="direction" value="down">
                         <button type="submit" <?= $i === count($materials) - 1 ? 'disabled' : '' ?>>&darr;</button>
                     </form>
+                    <a href="/admin/classes/<?= rawurlencode($classSlug) ?>/exams?lesson=<?= rawurlencode($topicSlug . '/' . $material['slug']) ?>">+ Exam</a>
                     <a href="/class/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($topicSlug) ?>/<?= rawurlencode($material['slug']) ?>" target="_blank">View</a>
                     <form method="post" action="/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>/materials/<?= rawurlencode($material['slug']) ?>/delete" class="inline-form" onsubmit="return confirm('Delete this material?');">
                         <?= Csrf::field() ?>
