@@ -631,6 +631,20 @@ input.pts { width: 4.5rem; }
 .opt-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem; }
 .opt-row input[type=text] { flex: 1; margin-top: 0; }
 .builder-add { display: flex; gap: 0.5rem; margin: 1rem 0; }
+.editor-divider { border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0 1rem; }
+.editor-toolbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: sticky; bottom: 0.75rem; }
+.editor-toolbar .toolbar-spacer { flex: 1; }
+.editor-toolbar form { margin: 0; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; margin: 0; border-radius: var(--radius); background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); cursor: pointer; text-decoration: none; }
+.icon-btn:hover { background: var(--blue-subtle); color: var(--blue); border-color: var(--blue-subtle); text-decoration: none; }
+.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.icon-btn.primary:hover { background: var(--blue); color: #fff; opacity: 0.9; }
+.icon-btn.danger { color: var(--red-text); }
+.icon-btn.danger:hover { background: var(--red-subtle); border-color: var(--red-subtle); color: var(--red-text); }
+.icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.copy-dialog { border: 0; border-radius: var(--radius); padding: 1.25rem 1.5rem; width: min(420px, 92vw); }
+.copy-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
 .q.review .answer { padding: 0.5rem 0.75rem; background: #f3f4f6; border-radius: 6px; }
 .q.review .text-answer { white-space: pre-wrap; }
 .q.review .ok { color: #166534; }
