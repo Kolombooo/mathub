@@ -9,10 +9,10 @@ colors:
   green-text: "#007857"
   green-subtle: "#dbf2ec"
   orange: "#f18816"
-  orange-text: "#a65b0a"
+  orange-text: "#9c5409"
   orange-subtle: "#fdeede"
   red: "#d4605f"
-  red-text: "#b8403f"
+  red-text: "#b03a39"
   red-subtle: "#fbe2e2"
   ink: "#1f2733"
   ink-secondary: "#4a5666"
@@ -136,8 +136,8 @@ A restrained palette: one muted blue, cool neutrals, and three status hues used 
 - **Chalk Green** (#00a174) with text tone **Pine** (#007857) on **Green Mist** (#dbf2ec): success flashes and "ok" badges.
 
 ### Tertiary
-- **Amber** (#f18816) with text tone **Burnt Amber** (#a65b0a) on **Amber Mist** (#fdeede): warning badges.
-- **Marker Red** (#d4605f) with text tone **Brick** (#b8403f) on **Red Mist** (#fbe2e2): errors, destructive actions, and flagged exam-monitoring events.
+- **Amber** (#f18816) with text tone **Burnt Amber** (#9c5409) on **Amber Mist** (#fdeede): warning badges.
+- **Marker Red** (#d4605f) with text tone **Brick** (#b03a39) on **Red Mist** (#fbe2e2): errors, destructive actions, and flagged exam-monitoring events.
 
 ### Neutral
 - **Ink** (#1f2733): primary text and headings.
@@ -186,7 +186,7 @@ Flat by default. Surfaces are separated by 1px hairline borders and the white-on
 - **Resting list** (`box-shadow: 0 1px 2px rgba(31, 39, 51, 0.04)`): barely-there lift on the teacher's manage lists only.
 - **Floating menu** (`box-shadow: 0 8px 24px rgba(11, 14, 18, 0.12)`): row-action dropdown panels.
 - **Drawer** (`box-shadow: 0 0 40px rgba(11, 14, 18, 0.25)`) over a 45% dark scrim: the mobile sidebar.
-- **Exam timer** (`box-shadow: 0 2px 8px rgba(0,0,0,0.25)`): the fixed countdown pill during exams. It also uses off-token colors (#111827, and #b91c1c when time is low); treat these as a known deviation, not a pattern to copy.
+- **Exam timer** (`box-shadow: 0 2px 8px rgba(11, 14, 18, 0.25)`): the fixed countdown pill during exams, in Ink, turning Brick when time is low.
 - **Focus ring** (`box-shadow: 0 0 0 3px rgba(70, 104, 159, 0.18)`): keyboard focus on buttons and links; inputs use a blue border plus a 0.12 alpha ring.
 
 ### Named Rules

@@ -6,8 +6,8 @@
     "colorMeta": {
       "blue": { "role": "primary", "displayName": "Slate Blue", "canonical": "#46689f", "tonalRamp": ["#1a2840", "#26395a", "#334c7a", "#46689f", "#6a89b8", "#93abcf", "#c4d1e4", "#e3e8f1"] },
       "green": { "role": "secondary", "displayName": "Chalk Green", "canonical": "#00a174", "tonalRamp": ["#00382a", "#005340", "#007857", "#00a174", "#3fbb98", "#7ed3bb", "#b5e6d8", "#dbf2ec"] },
-      "orange": { "role": "tertiary", "displayName": "Amber", "canonical": "#f18816", "tonalRamp": ["#4a2803", "#7a420a", "#a65b0a", "#f18816", "#f4a24a", "#f8bf80", "#fbd9b2", "#fdeede"] },
-      "red": { "role": "tertiary", "displayName": "Marker Red", "canonical": "#d4605f", "tonalRamp": ["#4a1514", "#7a2625", "#b8403f", "#d4605f", "#e08483", "#eaa8a7", "#f3c9c8", "#fbe2e2"] },
+      "orange": { "role": "tertiary", "displayName": "Amber", "canonical": "#f18816", "tonalRamp": ["#4a2803", "#7a420a", "#9c5409", "#f18816", "#f4a24a", "#f8bf80", "#fbd9b2", "#fdeede"] },
+      "red": { "role": "tertiary", "displayName": "Marker Red", "canonical": "#d4605f", "tonalRamp": ["#4a1514", "#7a2625", "#b03a39", "#d4605f", "#e08483", "#eaa8a7", "#f3c9c8", "#fbe2e2"] },
       "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1f2733", "tonalRamp": ["#1f2733", "#4a5666", "#606d81", "#8792a3", "#b3bfce", "#d3dae4", "#e2e7ee", "#f6f8fb"] }
     },
     "typographyMeta": {
@@ -50,7 +50,7 @@
       "name": "Danger Button", "kind": "button", "refersTo": "button-danger",
       "description": "Destructive action; outlined, never solid red.",
       "html": "<button class=\"ds-btn-danger\">Delete</button>",
-      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 24px;border-radius:4px;border:1px solid #e2e7ee;background:#fff;color:#b8403f;font:600 16px/1.2 'Hanken Grotesk',system-ui,sans-serif;cursor:pointer;transition:background .12s}.ds-btn-danger:hover{background:#fbe2e2;border-color:#fbe2e2}.ds-btn-danger:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(70,104,159,.18)}"
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 24px;border-radius:4px;border:1px solid #e2e7ee;background:#fff;color:#b03a39;font:600 16px/1.2 'Hanken Grotesk',system-ui,sans-serif;cursor:pointer;transition:background .12s}.ds-btn-danger:hover{background:#fbe2e2;border-color:#fbe2e2}.ds-btn-danger:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(70,104,159,.18)}"
     },
     {
       "name": "Text Input", "kind": "input", "refersTo": "input",
@@ -68,7 +68,7 @@
       "name": "Badge", "kind": "chip", "refersTo": "badge",
       "description": "Small status tags in tinted colors.",
       "html": "<span class=\"ds-badge\">Draft</span> <span class=\"ds-badge ok\">Marked</span> <span class=\"ds-badge danger\">Flagged</span>",
-      "css": ".ds-badge{display:inline-flex;padding:0 6px;border-radius:2px;background:#eff0f3;color:#606d81;font:600 12px/1.5 'Hanken Grotesk',system-ui,sans-serif}.ds-badge.ok{background:#dbf2ec;color:#007857}.ds-badge.danger{background:#fbe2e2;color:#b8403f}"
+      "css": ".ds-badge{display:inline-flex;padding:0 6px;border-radius:2px;background:#eff0f3;color:#606d81;font:600 12px/1.5 'Hanken Grotesk',system-ui,sans-serif}.ds-badge.ok{background:#dbf2ec;color:#007857}.ds-badge.danger{background:#fbe2e2;color:#b03a39}"
     },
     {
       "name": "List Card", "kind": "card",
