@@ -240,7 +240,15 @@ button.small, .button.small, .button-secondary.small, .btn-compact {
 }
 .tabs a:hover { background: var(--surface-muted); text-decoration: none; }
 .tabs a.active { color: var(--blue); border-bottom-color: var(--blue); }
+/* The exam code is the student's one urgent task: Mist Blue marks it as the place to act */
+.code-form { background: var(--blue-subtle); border-radius: var(--radius-lg); padding: 20px 24px; margin-top: 2rem; }
 .code-form h2 { margin-top: 0; }
+.code-form .empty { color: var(--text); }
+.code-form label { margin-bottom: 1rem; }
+.code-form .flash-error { background: var(--surface); }
+/* Field boundary needs 3:1 against the tint */
+.code-form input[type=text] { border-color: var(--gray-text); }
+.code-form input[type=text]:focus { border-color: var(--blue); }
 
 /* ---------- Tables / lists ---------- */
 .manage-list {

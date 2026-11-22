@@ -212,6 +212,9 @@ Small and firm. Controls, buttons, flash messages and menu items use a 4px radiu
 - **Shadow Strategy:** flat, see Elevation.
 - **Internal Padding:** 20px 24px for panels; list cards put padding inside the link (16px 20px) so the whole row is the hit target, and hover tints it Page Wash.
 
+### Exam Code Panel
+The one place Mist Blue is used as a surface: the student's exam-code form sits in a Mist Blue 8px panel (20px 24px padding), with Ink text and a Quiet Gray input border so the field keeps 3:1 against the tint. It marks the student's single urgent task and is the only filled panel on the public site.
+
 ### Inputs / Fields
 - **Style:** white, 1px Field Line border, 4px radius, 40px tall, 16px text. Labels above in 14px semibold. Selects use an inline chevron; checkboxes and radios are 18px in Slate Blue.
 - **Focus:** border turns Slate Blue with a 3px 12% blue halo. Hover darkens the border.
@@ -224,7 +227,7 @@ Small and firm. Controls, buttons, flash messages and menu items use a 4px radiu
 - **Mobile:** off-canvas drawer behind a CSS-only checkbox toggle, scrim at 45% dark.
 
 ### Badges and Pills
-Tiny 12px semibold tags with 2px radius in tinted status colors (gray, green, amber, red, blue); pills are round count chips.
+Tiny 12px semibold tags with 2px radius in tinted status colors (gray, green, amber, red, blue); pills are round count chips. Submission status uses them as a set: blue for still working, amber for submitted and awaiting marking, green for marked. Gray is for neutral state such as an unpublished draft.
 
 ### Lists and Tables
 Teacher "manage lists" are bordered 8px cards of 56px-min rows (12px 16px padding, hairline row dividers, hover Page Wash tint) with right-aligned actions and a details/summary row menu. Data tables share the border and radius, with Page Wash header cells in 14px semibold Slate Text.
