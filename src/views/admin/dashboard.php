@@ -1,9 +1,13 @@
-<h1>Admin &middot; Classes</h1>
-<p><a href="/admin/exam-contents" class="button">Exam content library</a></p>
+<div class="page-header">
+    <div>
+        <h1>Classes</h1>
+        <p class="page-sub">Select a class to manage its topics, materials and exams.</p>
+    </div>
+</div>
 
-<form method="post" action="/admin/classes" class="inline-form form-add">
+<form method="post" action="/admin/classes" class="toolbar">
     <?= Csrf::field() ?>
-    <input type="text" name="title" placeholder="New class name" required>
+    <input type="text" name="title" placeholder="New class name" required aria-label="New class name" style="margin:0;width:280px">
     <button type="submit">Add class</button>
 </form>
 
@@ -12,18 +16,27 @@
 <?php else: ?>
     <ul class="manage-list">
         <?php foreach ($classes as $class): ?>
+            <?php $classUrl = '/admin/classes/' . rawurlencode($class['slug']); ?>
             <li>
-                <a href="/admin/classes/<?= rawurlencode($class['slug']) ?>"><?= View::e($class['title']) ?></a>
+                <a href="<?= $classUrl ?>"><?= View::e($class['title']) ?></a>
                 <span class="actions">
-                    <form method="post" action="/admin/classes/<?= rawurlencode($class['slug']) ?>/rename" class="inline-form">
-                        <?= Csrf::field() ?>
-                        <input type="text" name="title" value="<?= View::e($class['title']) ?>" required>
-                        <button type="submit">Rename</button>
-                    </form>
-                    <form method="post" action="/admin/classes/<?= rawurlencode($class['slug']) ?>/delete" class="inline-form" onsubmit="return confirm('Delete this class and everything in it?');">
-                        <?= Csrf::field() ?>
-                        <button type="submit" class="danger">Delete</button>
-                    </form>
+                    <a href="<?= $classUrl ?>/exams">Exams</a>
+                    <a href="<?= $classUrl ?>">Topics</a>
+                    <details class="menu">
+                        <summary aria-label="Class actions"><?= AdminNav::icon('more_vert') ?></summary>
+                        <div class="menu-panel">
+                            <form method="post" action="<?= $classUrl ?>/rename">
+                                <?= Csrf::field() ?>
+                                <input type="text" name="title" value="<?= View::e($class['title']) ?>" required aria-label="Class name">
+                                <button type="submit" class="small">Rename</button>
+                            </form>
+                            <hr>
+                            <form method="post" action="<?= $classUrl ?>/delete" onsubmit="return confirm('Delete this class and everything in it?');">
+                                <?= Csrf::field() ?>
+                                <button type="submit" class="danger small">Delete class</button>
+                            </form>
+                        </div>
+                    </details>
                 </span>
             </li>
         <?php endforeach; ?>
