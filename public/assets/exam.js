@@ -109,7 +109,9 @@
         files: {},     // qid -> { blob, name }
         drawData: {},  // qid -> SignaturePad point groups (to re-open a drawing)
         submitting: false,
-        done: false
+        done: false,
+        deadline: null,    // local-clock ms when the time limit ends (null = no limit)
+        autoSubmit: null   // set by renderExam
     };
 
     var startForm = document.getElementById('exam-start');
@@ -657,12 +659,15 @@
         submit.addEventListener('click', function () { submitExam(submit, errorBox); });
         main.appendChild(errorBox);
         main.appendChild(el('div', { class: 'form-actions' }, [submit]));
+        state.autoSubmit = function () { doSubmit(submit, errorBox); };
+        setupTimer();
 
         startForm.hidden = true;
         main.hidden = false;
         window.scrollTo(0, 0);
         Guard.init({ root: root, exam: state.exam, resumed: !!resumeInfo, lastSeen: resumeInfo ? resumeInfo.lastSeen : null });
         resumeInfo = null;
+        window.dispatchEvent(new Event('mathub-exam-rendered'));
     }
 
     // ------------------------------------------------------------------
@@ -678,6 +683,11 @@
     function begin(data, resumed) {
         state.sid = data.submissionId;
         state.exam = data.exam;
+        var limitMin = parseInt((data.exam.settings || {}).timeLimitMin, 10) || 0;
+        // Server clock decides: remaining time = (startedAt + limit) - serverTime, applied to the local clock.
+        state.deadline = limitMin > 0 && data.startedAt && data.serverTime
+            ? Date.now() + ((data.startedAt + limitMin * 60) - data.serverTime) * 1000
+            : null;
         if (!resumed) { state.answers = {}; }
         renderExam();
         saveDraft();
@@ -760,6 +770,48 @@
             errorBox.hidden = false;
         });
     }
+
+    // ------------------------------------------------------------------
+    // Time limit: a countdown from the server's clock. At zero the answers are
+    // submitted automatically (and retried until the server accepts them). The
+    // server enforces the limit independently: late submissions are flagged.
+    // ------------------------------------------------------------------
+    var timerBox = null;
+    function fmtClock(sec) {
+        var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+        return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+    function setupTimer() {
+        if (state.deadline === null || timerBox) { return; }
+        timerBox = el('div', { class: 'exam-timer', role: 'timer' });
+        document.body.appendChild(timerBox);
+        tickTimer();
+        setInterval(tickTimer, 1000);
+    }
+    function tickTimer() {
+        if (!timerBox) { return; }
+        if (state.done) { timerBox.remove(); timerBox = null; return; }
+        var left = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+        timerBox.textContent = t('time_left') + ' ' + fmtClock(left);
+        timerBox.classList.toggle('exam-timer-low', left <= 300);
+        if (left === 0 && !state.submitting && state.autoSubmit) {
+            timerBox.textContent = t('time_up');
+            state.autoSubmit();
+        }
+    }
+
+    // Server heartbeat: lets the server notice silence (browser frozen, script
+    // blocked, page left) on ITS clock, and whether the guard scripts are running.
+    function heartbeat() {
+        if (!state.exam || state.done || !state.sid) { return; }
+        var fd = new FormData();
+        fd.append('csrf_token', app.dataset.csrf);
+        fd.append('type', 'heartbeat');
+        fd.append('guard', (Guard.active && Guard.modules.length > 0) ? '1' : '0');
+        try { fetch(app.dataset.eventUrl + encodeURIComponent(state.sid), { method: 'POST', body: fd, keepalive: true, credentials: 'same-origin' }).catch(function () {}); } catch (e) { /* offline: the server will see the gap */ }
+    }
+    setInterval(heartbeat, 10000);
+    window.addEventListener('mathub-exam-rendered', heartbeat);
 
     // Heartbeat so a reopened exam can tell how long the browser was gone,
     // even if it was killed without any event.

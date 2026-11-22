@@ -5,10 +5,23 @@ final class Exams
     public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'upload', 'draw'];
 
     /** Event types the teacher should see in red. */
-    public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened'];
+    public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened', 'heartbeat_lost', 'guard_missing', 'late_submit'];
     /** Events the browser may report on its own while the page is going away. */
     public const BEACON_TYPES = ['page_closed'];
-    public const DEFAULT_SETTINGS = ['monitor' => true, 'fullscreen' => true];
+    /**
+     * Event types only the server may create (server clock, tamper-resistant).
+     * Anything the client submits with one of these types is discarded.
+     */
+    public const SERVER_TYPES = ['page_closed', 'heartbeat_lost', 'guard_missing', 'late_submit'];
+    public const DEFAULT_SETTINGS = ['monitor' => true, 'fullscreen' => true, 'timeLimitMin' => 0];
+
+    /** The exam page pings the server this often (seconds); see exam.js. */
+    public const HEARTBEAT_SEC = 10;
+    /** Silence longer than this is recorded as `heartbeat_lost`. */
+    public const HEARTBEAT_GAP_SEC = 45;
+    /** Slack on the time limit for slow uploads / clock skew before a submission counts as late. */
+    public const TIME_GRACE_SEC = 60;
+    private const MAX_EVENTS = 1000;
 
     public const MAX_FILE_BYTES = 10 * 1024 * 1024;
     private const UPLOAD_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'zip'];
@@ -54,7 +67,12 @@ final class Exams
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
-        file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        // Write to a temp file and rename: readers never see a half-written file.
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), LOCK_EX) === false || !rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new StorageException('Could not write ' . basename($path));
+        }
     }
 
     // ---------- Exam content (the teacher's question library) ----------
@@ -363,6 +381,7 @@ final class Exams
         $exam['settings'] = [
             'monitor' => !empty($settings['monitor']),
             'fullscreen' => !empty($settings['fullscreen']),
+            'timeLimitMin' => max(0, min(1440, (int)($settings['timeLimitMin'] ?? 0))),
         ];
         self::writeJson(self::examDir($classSlug, $examId) . '/exam.json', $exam);
     }
@@ -568,6 +587,50 @@ final class Exams
         return self::readJson($dir . '/submissions/' . $sid . '.json');
     }
 
+    /**
+     * Atomic read-modify-write of one submission. Takes an exclusive lock, re-reads
+     * the file, calls $fn($sub) and saves what it returns (return null to leave the
+     * file untouched). Everything that changes a submission that may be written
+     * concurrently (beacons, heartbeats, submit, teacher marking) goes through here,
+     * so no update can overwrite another. Exceptions thrown by $fn propagate
+     * (the lock is released). Returns the saved submission, or null.
+     */
+    public static function mutateSubmission(string $classSlug, string $examId, string $sid, callable $fn): ?array
+    {
+        $dir = self::examDir($classSlug, $examId);
+        if ($dir === null || !self::validSid($sid)) {
+            return null;
+        }
+        $path = $dir . '/submissions/' . $sid . '.json';
+        if (!is_file($path)) {
+            return null;
+        }
+        $lock = fopen($path . '.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            throw new StorageException(I18n::ui('Invalid submission.'));
+        }
+        try {
+            $sub = self::readJson($path);
+            if ($sub === null) {
+                return null;
+            }
+            $new = $fn($sub);
+            if (!is_array($new)) {
+                return null;
+            }
+            self::writeJson($path, $new);
+            return $new;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    private static function serverEvent(string $type, array $detail, int $at): array
+    {
+        return ['type' => $type, 'at' => $at, 'detail' => json_encode($detail), 'server' => true];
+    }
+
     public static function saveSubmission(string $classSlug, string $examId, array $sub): void
     {
         $dir = self::examDir($classSlug, $examId);
@@ -601,6 +664,7 @@ final class Exams
             return;
         }
         @unlink($dir . '/submissions/' . $sid . '.json');
+        @unlink($dir . '/submissions/' . $sid . '.json.lock');
         self::rrmdir($dir . '/files/' . $sid);
     }
 
@@ -617,55 +681,129 @@ final class Exams
     public static function submit(string $classSlug, string $examId, string $sid, array $payload, array $files): void
     {
         $exam = self::getExam($classSlug, $examId);
-        $sub = self::getSubmission($classSlug, $examId, $sid);
-        if ($exam === null || $sub === null) {
+        if ($exam === null) {
             throw new StorageException(I18n::ui('Unknown submission.'));
         }
-        if ($sub['status'] !== 'working') {
-            throw new StorageException(I18n::ui('This exam was already submitted.'));
-        }
+        $settings = self::settingsOf($exam);
 
-        $raw = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
-        $answers = [];
-        $scores = [];
-        foreach ($exam['questions'] as $q) {
-            $qid = $q['id'];
-            $answer = self::cleanAnswer($q, $raw[$qid] ?? null);
-            if ($q['type'] === 'upload' || $q['type'] === 'draw') {
-                $answer = self::storeFile($classSlug, $examId, $sid, $q, $files['file_' . $qid] ?? null);
+        $saved = self::mutateSubmission($classSlug, $examId, $sid, function (array $sub) use ($exam, $settings, $classSlug, $examId, $sid, $payload, $files): array {
+            if ($sub['status'] !== 'working') {
+                throw new StorageException(I18n::ui('This exam was already submitted.'));
             }
-            $answers[$qid] = $answer;
-            $scores[$qid] = self::autoScore($q, $answer);
-        }
 
-        $now = time();
-        $sub['answers'] = $answers;
-        $sub['scores'] = $scores;
-        $sub['autoScores'] = $scores;
-        $sub['status'] = 'submitted';
-        $sub['submittedAt'] = $now;
-        $sub['durationSec'] = max(0, $now - (int)$sub['startedAt']);
-        // Keep server-recorded events (page_closed beacons) and add the client's.
-        $events = array_merge((array)($sub['events'] ?? []), self::cleanEvents($payload['events'] ?? []));
-        usort($events, fn($a, $b) => $a['at'] <=> $b['at']);
-        $sub['events'] = array_slice($events, 0, 1000);
-        self::saveSubmission($classSlug, $examId, $sub);
+            $raw = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
+            $answers = [];
+            $scores = [];
+            foreach ($exam['questions'] as $q) {
+                $qid = $q['id'];
+                $answer = self::cleanAnswer($q, $raw[$qid] ?? null);
+                if ($q['type'] === 'upload' || $q['type'] === 'draw') {
+                    $answer = self::storeFile($classSlug, $examId, $sid, $q, $files['file_' . $qid] ?? null);
+                }
+                $answers[$qid] = $answer;
+                $scores[$qid] = self::autoScore($q, $answer);
+            }
+
+            $now = time();
+            $started = (int)$sub['startedAt'];
+            $sub['answers'] = $answers;
+            $sub['scores'] = $scores;
+            $sub['autoScores'] = $scores;
+            $sub['status'] = 'submitted';
+            $sub['submittedAt'] = $now;
+            $sub['durationSec'] = max(0, $now - $started);
+
+            // Server-authoritative evidence (server clock, not the browser's).
+            $server = array_values(array_filter((array)($sub['events'] ?? []), fn($e) => !empty($e['server']) || in_array($e['type'] ?? '', self::SERVER_TYPES, true)));
+
+            // 1. Time limit. The work is kept (a teacher decides), but flagged.
+            $limitSec = (int)$settings['timeLimitMin'] * 60;
+            if ($limitSec > 0) {
+                $over = $now - ($started + $limitSec);
+                if ($over > self::TIME_GRACE_SEC) {
+                    $sub['late'] = true;
+                    $sub['overtimeSec'] = $over;
+                    $server[] = self::serverEvent('late_submit', ['durationSec' => $over, 'limitMin' => (int)$settings['timeLimitMin']], $now);
+                }
+            }
+
+            if (!empty($settings['monitor'])) {
+                $beat = (array)($sub['beat'] ?? []);
+                $last = (int)($beat['last'] ?? $started);
+                // 2. Silence between the last heartbeat and now.
+                if ($now - $last > self::HEARTBEAT_GAP_SEC) {
+                    $server[] = self::serverEvent('heartbeat_lost', ['durationSec' => $now - $last, 'final' => true], $last);
+                }
+                // 3. The guard never reported in: script blocked/removed or tampered with.
+                if (empty($beat['guard']) && $sub['durationSec'] >= self::HEARTBEAT_SEC * 2) {
+                    $server[] = self::serverEvent('guard_missing', ['beats' => (int)($beat['count'] ?? 0)], $now);
+                }
+            }
+
+            // Client events never get to use server-only types; server events are kept first
+            // so a flood of client events cannot push them out of the cap.
+            $client = array_values(array_filter(self::cleanEvents($payload['events'] ?? []), fn($e) => !in_array($e['type'], self::SERVER_TYPES, true)));
+            $client = array_slice($client, 0, max(0, self::MAX_EVENTS - count($server)));
+            $events = array_merge($server, $client);
+            usort($events, fn($a, $b) => $a['at'] <=> $b['at']);
+            $sub['events'] = array_slice($events, 0, self::MAX_EVENTS);
+            return $sub;
+        });
+        if ($saved === null) {
+            throw new StorageException(I18n::ui('Unknown submission.'));
+        }
     }
 
     /** Records an event reported by the browser as the page closes (server time). */
     public static function addBeaconEvent(string $classSlug, string $examId, string $sid, string $type, $detail): void
     {
-        $sub = self::getSubmission($classSlug, $examId, $sid);
-        if ($sub === null || $sub['status'] !== 'working' || !in_array($type, self::BEACON_TYPES, true)) {
+        if (!in_array($type, self::BEACON_TYPES, true)) {
             return;
         }
-        $events = (array)($sub['events'] ?? []);
-        if (count($events) >= 1000) {
-            return;
-        }
-        $events[] = ['type' => $type, 'at' => time(), 'detail' => mb_substr(json_encode($detail), 0, 500)];
-        $sub['events'] = $events;
-        self::saveSubmission($classSlug, $examId, $sub);
+        self::mutateSubmission($classSlug, $examId, $sid, function (array $sub) use ($type, $detail): ?array {
+            if ($sub['status'] !== 'working') {
+                return null;
+            }
+            $events = (array)($sub['events'] ?? []);
+            if (count($events) >= self::MAX_EVENTS - 100) { // headroom for later server events
+                return null;
+            }
+            $events[] = ['type' => $type, 'at' => time(), 'detail' => mb_substr(json_encode($detail), 0, 500), 'server' => true];
+            $sub['events'] = $events;
+            return $sub;
+        });
+    }
+
+    /**
+     * Heartbeat from the open exam page. Records the server time of the ping and,
+     * when the previous ping is too old, a `heartbeat_lost` event measured entirely
+     * on the server's clock. $guard says whether the guard scripts are running.
+     */
+    public static function addHeartbeat(string $classSlug, string $examId, string $sid, bool $guard): void
+    {
+        self::mutateSubmission($classSlug, $examId, $sid, function (array $sub) use ($guard): ?array {
+            if ($sub['status'] !== 'working') {
+                return null;
+            }
+            $now = time();
+            $beat = (array)($sub['beat'] ?? ['last' => (int)$sub['startedAt'], 'count' => 0, 'guard' => false]);
+            $last = (int)($beat['last'] ?? $sub['startedAt']);
+            if ($now - $last < 3 && !empty($beat['count'])) {
+                return null; // ignore floods; no write
+            }
+            $gap = $now - $last;
+            $events = (array)($sub['events'] ?? []);
+            if ($gap > self::HEARTBEAT_GAP_SEC && !empty($beat['count']) && count($events) < self::MAX_EVENTS - 100) {
+                $events[] = self::serverEvent('heartbeat_lost', ['durationSec' => $gap], $last);
+                $sub['events'] = $events;
+            }
+            $sub['beat'] = [
+                'last' => $now,
+                'count' => (int)($beat['count'] ?? 0) + 1,
+                'guard' => !empty($beat['guard']) || $guard,
+            ];
+            return $sub;
+        });
     }
 
     /** @return array{count:int, awaySec:int} red-flag summary for a submission */
@@ -702,6 +840,12 @@ final class Exams
                 return [I18n::ui('Closed or reloaded the page / browser'), true];
             case 'page_reopened':
                 return [I18n::ui('Reopened the exam after being gone {time}', ['time' => $time]), true];
+            case 'heartbeat_lost':
+                return [I18n::ui('No contact with the exam page for {time} (measured by the server)', ['time' => $time]), true];
+            case 'guard_missing':
+                return [I18n::ui('Monitoring script never reported in (blocked or tampered with)'), true];
+            case 'late_submit':
+                return [I18n::ui('Submitted {time} after the time limit', ['time' => $time]), true];
             case 'fullscreen_unsupported':
                 return [I18n::ui('Browser does not support fullscreen'), false];
         }

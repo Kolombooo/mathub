@@ -85,10 +85,12 @@ if ($method === 'POST' && count($decoded) === 4 && $decoded[0] === 'exams' && $d
     ]);
 }
 
-// Browser telemetry sent via sendBeacon while the page is closing.
+// Browser telemetry: `heartbeat` pings while the exam is open, and sendBeacon events while the page is closing.
 if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $decoded[3] === 'event') {
     [, $classSlug, $examId, , $sid] = $decoded;
-    if (Csrf::verify($_POST['csrf_token'] ?? null)) {
+    if (Csrf::verify($_POST['csrf_token'] ?? null) && ($_POST['type'] ?? '') === 'heartbeat') {
+        Exams::addHeartbeat($classSlug, $examId, $sid, ($_POST['guard'] ?? '') === '1');
+    } elseif (Csrf::verify($_POST['csrf_token'] ?? null)) {
         Exams::addBeaconEvent($classSlug, $examId, $sid, (string)($_POST['type'] ?? ''), json_decode((string)($_POST['detail'] ?? 'null'), true));
     }
     http_response_code(204);

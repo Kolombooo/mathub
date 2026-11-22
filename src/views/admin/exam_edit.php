@@ -61,6 +61,10 @@
             <input type="checkbox" name="fullscreen" value="1" <?= $st['fullscreen'] ? 'checked' : '' ?>>
             <?= View::tr('Start the exam in fullscreen and require it until the exam is submitted') ?>
         </label>
+        <label><?= View::tr('Time limit in minutes (0 = no limit)') ?>
+            <input type="number" name="time_limit" min="0" max="1440" step="1" value="<?= (int)$st['timeLimitMin'] ?>">
+        </label>
+        <p class="muted"><?= View::tr('A countdown is shown and the answers are submitted automatically at zero. The server also checks the time: a submission arriving more than a minute late is kept but flagged.') ?></p>
     </fieldset>
 
     <div class="form-actions">

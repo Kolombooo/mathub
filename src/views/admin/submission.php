@@ -37,6 +37,7 @@ $pairById = function (array $q, string $id): ?array {
     <?php if (!$working): ?>
         &middot; <?= View::tr('submitted') ?> <?= date('H:i:s', (int)$sub['submittedAt']) ?>
         &middot; <?= View::tr('took') ?> <?= sprintf('%d:%02d', intdiv((int)$sub['durationSec'], 60), (int)$sub['durationSec'] % 60) ?>
+        <?php if (!empty($sub['late'])): ?>&middot; <span class="flag"><?= View::tr('Submitted {time} after the time limit', ['time' => sprintf('%d:%02d', intdiv((int)$sub['overtimeSec'], 60), (int)$sub['overtimeSec'] % 60)]) ?></span><?php endif; ?>
     <?php endif; ?>
 </p>
 
