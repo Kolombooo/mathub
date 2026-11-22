@@ -1,16 +1,17 @@
 <?php $base = '/admin/classes/' . rawurlencode($classSlug); ?>
-<p class="breadcrumbs">
-    <a href="/admin">Admin</a> &rsaquo;
-    <a href="<?= $base ?>"><?= View::e($classTitle) ?></a>
-</p>
-<h1><?= View::e($classTitle) ?> &middot; Exams</h1>
+<div class="page-header">
+    <div>
+        <h1>Exams</h1>
+        <p class="page-sub"><?= View::e($classTitle) ?></p>
+    </div>
+</div>
 <p class="empty">An exam belongs to one lesson, has its own code and uses one exam content from your <a href="/admin/exam-contents">library</a>. Students enter the code on the home page or on the lesson page.</p>
 
-<h2>New exam</h2>
+<div class="section-title"><h2>New exam</h2></div>
 <?php if (empty($lessons)): ?>
     <p class="empty">Create a lesson (material) in a topic first.</p>
 <?php else: ?>
-<form method="post" action="<?= $base ?>/exams" class="form-narrow">
+<form method="post" action="<?= $base ?>/exams" class="panel form-narrow" style="max-width:480px">
     <?= Csrf::field() ?>
     <label>Title
         <input type="text" name="title" required>
@@ -34,7 +35,7 @@
 </form>
 <?php endif; ?>
 
-<h2>Exams</h2>
+<div class="section-title"><h2>All exams</h2></div>
 <?php if (empty($exams)): ?>
     <p class="empty">No exams yet.</p>
 <?php else: ?>
@@ -49,13 +50,13 @@
                 <span>
                     <a href="<?= $examBase ?>"><?= View::e($exam['title']) ?></a>
                     <span class="badge <?= !empty($exam['published']) ? 'badge-ok' : '' ?>"><?= !empty($exam['published']) ? 'Published' : 'Draft' ?></span>
-                    <span class="muted">code <strong><?= View::e($exam['code'] ?? '–') ?></strong> &middot; lesson: <?= $lessonTitle !== null ? View::e($lessonTitle) : '–' ?> &middot; content: <?= View::e($exam['contentTitle'] ?? '–') ?></span>
+                    <span class="item-meta">code <strong><?= View::e($exam['code'] ?? '–') ?></strong> &middot; lesson: <?= $lessonTitle !== null ? View::e($lessonTitle) : '–' ?> &middot; content: <?= View::e($exam['contentTitle'] ?? '–') ?></span>
                 </span>
                 <span class="actions">
-                    <a href="<?= $examBase ?>/submissions">Submissions</a>
+                    <a href="<?= $examBase ?>/submissions" class="button-secondary small">Submissions</a>
                     <form method="post" action="<?= $examBase ?>/delete" class="inline-form" onsubmit="return confirm('Delete this exam and all submissions? The exam content stays in your library.');">
                         <?= Csrf::field() ?>
-                        <button type="submit" class="danger">Delete</button>
+                        <button type="submit" class="danger small">Delete</button>
                     </form>
                 </span>
             </li>

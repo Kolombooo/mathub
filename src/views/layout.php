@@ -1,31 +1,105 @@
+<?php
+$requestPath = rtrim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/') ?: '/';
+$isAdminShell = AdminNav::isAdminPage($requestPath);
+$flash = $_SESSION['flash'] ?? null;
+unset($_SESSION['flash']);
+?>
 <!DOCTYPE html>
 <html lang="<?= View::e($lang ?? I18n::defaultLang()) ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= isset($title) ? View::e($title) . ' · MatHub' : 'MatHub' ?></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500&amp;family=Hanken+Grotesk:wght@300;400;500;600;700&amp;display=swap">
 <link rel="stylesheet" href="<?= View::e(View::asset('/assets/style.css')) ?>">
 </head>
+<?php if ($isAdminShell): $nav = AdminNav::build($requestPath); ?>
+<body class="admin-body <?= View::e($bodyClass ?? '') ?>">
+<input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true">
+<div class="admin-shell">
+    <aside class="sidebar" aria-label="Teacher navigation">
+        <div class="sidebar-head">
+            <a class="brand" href="/admin">MatHub</a>
+            <label for="nav-toggle" class="sidebar-close" aria-label="Close menu"><?= AdminNav::icon('close') ?></label>
+        </div>
+
+        <?php if ($nav['class'] !== null): ?>
+            <a class="sidebar-back" href="/admin"><?= AdminNav::icon('arrow_back') ?><span>All classes</span></a>
+            <div class="sidebar-class">
+                <span class="sidebar-eyebrow">Class</span>
+                <strong><?= View::e($nav['class']['title']) ?></strong>
+            </div>
+        <?php endif; ?>
+
+        <nav class="sidebar-nav">
+            <?php foreach ($nav['sections'] as $section): ?>
+                <div class="sidebar-section">
+                    <?php if ($section['label'] !== null): ?>
+                        <span class="sidebar-eyebrow"><?= View::e($section['label']) ?></span>
+                    <?php endif; ?>
+                    <ul>
+                        <?php foreach ($section['items'] as $item): ?>
+                            <li>
+                                <a class="sidebar-link<?= $item['active'] ? ' is-active' : '' ?>" href="<?= View::e($item['href']) ?>"<?= !empty($item['external']) ? ' target="_blank" rel="noopener"' : '' ?><?= $item['active'] ? ' aria-current="page"' : '' ?>>
+                                    <?= AdminNav::icon($item['icon']) ?>
+                                    <span><?= View::e($item['label']) ?></span>
+                                </a>
+                                <?php if (!empty($item['children'])): ?>
+                                    <ul class="sidebar-sub">
+                                        <?php foreach ($item['children'] as $child): ?>
+                                            <li><a class="sidebar-sublink<?= $child['active'] ? ' is-active' : '' ?>" href="<?= View::e($child['href']) ?>"><?= View::e($child['label']) ?></a></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endforeach; ?>
+        </nav>
+
+        <div class="sidebar-foot">
+            <a class="sidebar-link<?= $requestPath === '/admin/account' ? ' is-active' : '' ?>" href="/admin/account"><?= AdminNav::icon('person') ?><span>Account</span></a>
+            <a class="sidebar-link" href="/" target="_blank" rel="noopener"><?= AdminNav::icon('open_in_new') ?><span>View student site</span></a>
+            <form method="post" action="/admin/logout">
+                <?= Csrf::field() ?>
+                <button type="submit" class="sidebar-link"><?= AdminNav::icon('logout') ?><span>Log out</span></button>
+            </form>
+        </div>
+    </aside>
+    <label for="nav-toggle" class="sidebar-scrim" aria-hidden="true"></label>
+
+    <div class="admin-content">
+        <header class="admin-topbar">
+            <label for="nav-toggle" class="topbar-menu" aria-label="Open menu"><?= AdminNav::icon('menu') ?></label>
+            <a class="brand" href="/admin">MatHub</a>
+        </header>
+        <main class="admin-main">
+            <?php if (!empty($flash)): ?>
+                <div class="flash flash-<?= View::e($flash['type']) ?>"><?= View::e($flash['message']) ?></div>
+            <?php endif; ?>
+            <?= $content ?>
+        </main>
+    </div>
+</div>
+</body>
+<?php else: ?>
 <body class="<?= View::e($bodyClass ?? '') ?>">
 <header class="site-header">
     <a class="brand" href="/">MatHub</a>
     <nav>
         <?php if (Auth::isLoggedIn()): ?>
-            <a href="/admin">Admin</a>
-            <a href="/admin/account">Account</a>
-            <form method="post" action="/admin/logout" class="inline-form">
-                <?= Csrf::field() ?>
-                <button type="submit" class="link-button">Log out</button>
-            </form>
+            <a href="/admin">Teacher panel</a>
         <?php else: ?>
             <a href="/admin/login">Teacher login</a>
         <?php endif; ?>
     </nav>
 </header>
 <main class="site-main">
-<?php if (!empty($_SESSION['flash'])): ?>
-    <div class="flash flash-<?= View::e($_SESSION['flash']['type']) ?>"><?= View::e($_SESSION['flash']['message']) ?></div>
-    <?php unset($_SESSION['flash']); ?>
+<?php if (!empty($flash)): ?>
+    <div class="flash flash-<?= View::e($flash['type']) ?>"><?= View::e($flash['message']) ?></div>
 <?php endif; ?>
 <?= $content ?>
 </main>
@@ -33,4 +107,5 @@
     <span>MatHub &mdash; Material Hub</span>
 </footer>
 </body>
+<?php endif; ?>
 </html>
