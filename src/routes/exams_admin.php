@@ -29,14 +29,22 @@ if ($classTitle === null) {
     notFound();
 }
 
-// Exam list + class code ------------------------------------------------
+// Exam list + create ----------------------------------------------------
 if (count($decoded) === 4 && $method === 'GET') {
+    $lessons = [];
+    foreach (Storage::listTopics($classSlug) as $t) {
+        foreach (Storage::listMaterials($classSlug, $t['slug']) as $m) {
+            $lessons[] = ['value' => $t['slug'] . '/' . $m['slug'], 'topic' => $t['title'], 'title' => $m['title']];
+        }
+    }
     View::render('admin/exams', [
         'title' => 'Exams',
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
-        'code' => Storage::getClassCode($classSlug),
         'exams' => Exams::listExams($classSlug),
+        'lessons' => $lessons,
+        'contents' => Exams::listContents(),
+        'preselect' => (string)($_GET['lesson'] ?? ''),
     ]);
     exit;
 }
@@ -44,24 +52,17 @@ if (count($decoded) === 4 && $method === 'GET') {
 if (count($decoded) === 4 && $method === 'POST') {
     requireCsrf();
     try {
-        $id = Exams::createExam($classSlug, (string)($_POST['title'] ?? ''));
+        $id = Exams::createExam(
+            $classSlug,
+            (string)($_POST['title'] ?? ''),
+            Exams::parseLesson($classSlug, (string)($_POST['lesson'] ?? '')),
+            (string)($_POST['content_id'] ?? '')
+        );
         redirect($base . '/exams/' . rawurlencode($id));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
         redirect($base . '/exams');
     }
-}
-
-if (count($decoded) === 5 && $decoded[4] === 'code' && $method === 'POST') {
-    requireCsrf();
-    try {
-        $code = isset($_POST['generate']) ? Storage::generateClassCode() : (string)($_POST['code'] ?? '');
-        Storage::setClassCode($classSlug, $code);
-        flash('success', $code === '' ? 'Class code removed; exams are locked.' : 'Class code saved.');
-    } catch (StorageException $e) {
-        flash('error', $e->getMessage());
-    }
-    redirect($base . '/exams');
 }
 
 // Everything below is about one exam.
@@ -72,25 +73,40 @@ if ($exam === null) {
 }
 $examBase = $base . '/exams/' . rawurlencode($examId);
 
+$lessons = [];
+foreach (Storage::listTopics($classSlug) as $t) {
+    foreach (Storage::listMaterials($classSlug, $t['slug']) as $m) {
+        $lessons[] = ['value' => $t['slug'] . '/' . $m['slug'], 'topic' => $t['title'], 'title' => $m['title']];
+    }
+}
+
 if (count($decoded) === 5 && $method === 'GET') {
     View::render('admin/exam_edit', [
         'title' => $exam['title'],
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'exam' => $exam,
-        'types' => Exams::TYPES,
+        'lessons' => $lessons,
+        'contents' => Exams::listContents(),
+        'submissionCount' => Exams::submissionCount($classSlug, $examId),
     ]);
     exit;
 }
 
 if (count($decoded) === 6 && $decoded[5] === 'save' && $method === 'POST') {
     requireCsrf();
-    $questions = json_decode((string)($_POST['questions'] ?? '[]'), true);
     try {
-        Exams::saveExam($classSlug, $examId, (string)($_POST['title'] ?? ''), !empty($_POST['published']), is_array($questions) ? $questions : [], [
-            'monitor' => !empty($_POST['monitor']),
-            'fullscreen' => !empty($_POST['fullscreen']),
-        ]);
+        $code = isset($_POST['generate']) ? Exams::generateCode() : (string)($_POST['code'] ?? '');
+        Exams::saveExam(
+            $classSlug,
+            $examId,
+            (string)($_POST['title'] ?? ''),
+            !empty($_POST['published']),
+            ['monitor' => !empty($_POST['monitor']), 'fullscreen' => !empty($_POST['fullscreen'])],
+            Exams::parseLesson($classSlug, (string)($_POST['lesson'] ?? '')),
+            (string)($_POST['content_id'] ?? ''),
+            $code
+        );
         flash('success', 'Exam saved.');
     } catch (StorageException $e) {
         flash('error', $e->getMessage());

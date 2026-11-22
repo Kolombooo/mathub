@@ -143,39 +143,6 @@ final class Storage
         self::writeJson($dir . '/meta.json', $meta);
     }
 
-    /** The code students enter on the class page to unlock its exams ('' = exams disabled). */
-    public static function getClassCode(string $classSlug): string
-    {
-        $meta = self::readJson(Config::contentDir() . '/' . $classSlug . '/meta.json');
-        return (string)($meta['code'] ?? '');
-    }
-
-    public static function setClassCode(string $classSlug, string $code): void
-    {
-        $dir = Config::contentDir() . '/' . $classSlug;
-        if (!is_dir($dir)) {
-            throw new StorageException('Class not found.');
-        }
-        $code = trim($code);
-        if (mb_strlen($code) > 40) {
-            throw new StorageException('Class code is too long.');
-        }
-        $meta = self::readJson($dir . '/meta.json');
-        $meta['code'] = $code;
-        self::writeJson($dir . '/meta.json', $meta);
-    }
-
-    public static function generateClassCode(): string
-    {
-        // Unambiguous characters only (no 0/O, 1/I/L).
-        $alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-        $code = '';
-        for ($i = 0; $i < 6; $i++) {
-            $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-        return $code;
-    }
-
     // ---------- Topics ----------
 
     public static function listTopics(string $classSlug): array

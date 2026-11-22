@@ -1,6 +1,6 @@
 <p class="breadcrumbs">
     <a href="/"><?= View::e(I18n::t($lang, 'breadcrumb.classes')) ?></a> &rsaquo;
-    <a href="/class/<?= rawurlencode($classSlug) ?>?tab=exams"><?= View::e($classTitle) ?> &middot; <?= View::e(I18n::t($lang, 'exam.breadcrumb')) ?></a>
+    <a href="/class/<?= rawurlencode($classSlug) ?>"><?= View::e($classTitle) ?></a>
 </p>
 <h1><?= View::e($exam['title']) ?></h1>
 
