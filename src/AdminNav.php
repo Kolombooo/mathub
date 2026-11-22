@@ -60,10 +60,10 @@ final class AdminNav
             return [
                 'class' => null,
                 'sections' => [[
-                    'label' => 'Teacher panel',
+                    'label' => I18n::ui('Teacher panel'),
                     'items' => [
-                        ['label' => 'Classes', 'href' => '/admin', 'icon' => 'school', 'active' => $isClasses],
-                        ['label' => 'Exam content library', 'href' => '/admin/exam-contents', 'icon' => 'library_books', 'active' => ($segments[1] ?? null) === 'exam-contents'],
+                        ['label' => I18n::ui('Classes'), 'href' => '/admin', 'icon' => 'school', 'active' => $isClasses],
+                        ['label' => I18n::ui('Exam content library'), 'href' => '/admin/exam-contents', 'icon' => 'library_books', 'active' => ($segments[1] ?? null) === 'exam-contents'],
                     ],
                 ]],
             ];
@@ -88,14 +88,14 @@ final class AdminNav
             'sections' => [[
                 'label' => null,
                 'items' => [
-                    ['label' => 'Topics & materials', 'href' => $base, 'icon' => 'menu_book', 'active' => $onTopics, 'children' => $topicItems],
-                    ['label' => 'Exams', 'href' => $base . '/exams', 'icon' => 'assignment', 'active' => $onExams],
-                    ['label' => 'Class page', 'href' => '/class/' . rawurlencode($classSlug), 'icon' => 'open_in_new', 'active' => false, 'external' => true],
+                    ['label' => I18n::ui('Topics & materials'), 'href' => $base, 'icon' => 'menu_book', 'active' => $onTopics, 'children' => $topicItems],
+                    ['label' => I18n::ui('Exams'), 'href' => $base . '/exams', 'icon' => 'assignment', 'active' => $onExams],
+                    ['label' => I18n::ui('Class page'), 'href' => '/class/' . rawurlencode($classSlug), 'icon' => 'open_in_new', 'active' => false, 'external' => true],
                 ],
             ], [
-                'label' => 'Teacher panel',
+                'label' => I18n::ui('Teacher panel'),
                 'items' => [
-                    ['label' => 'Exam content library', 'href' => '/admin/exam-contents', 'icon' => 'library_books', 'active' => false],
+                    ['label' => I18n::ui('Exam content library'), 'href' => '/admin/exam-contents', 'icon' => 'library_books', 'active' => false],
                 ],
             ]],
         ];

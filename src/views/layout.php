@@ -19,16 +19,16 @@ unset($_SESSION['flash']);
 <body class="admin-body <?= View::e($bodyClass ?? '') ?>">
 <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true">
 <div class="admin-shell">
-    <aside class="sidebar" aria-label="Teacher navigation">
+    <aside class="sidebar" aria-label="<?= View::tr('Teacher navigation') ?>">
         <div class="sidebar-head">
-            <a class="brand" href="/admin">MatHub</a>
-            <label for="nav-toggle" class="sidebar-close" aria-label="Close menu"><?= AdminNav::icon('close') ?></label>
+            <a class="brand" href="/admin"><?= View::tr('MatHub') ?></a>
+            <label for="nav-toggle" class="sidebar-close" aria-label="<?= View::tr('Close menu') ?>"><?= AdminNav::icon('close') ?></label>
         </div>
 
         <?php if ($nav['class'] !== null): ?>
-            <a class="sidebar-back" href="/admin"><?= AdminNav::icon('arrow_back') ?><span>All classes</span></a>
+            <a class="sidebar-back" href="/admin"><?= AdminNav::icon('arrow_back') ?><span><?= View::tr('All classes') ?></span></a>
             <div class="sidebar-class">
-                <span class="sidebar-eyebrow">Class</span>
+                <span class="sidebar-eyebrow"><?= View::tr('Class') ?></span>
                 <strong><?= View::e($nav['class']['title']) ?></strong>
             </div>
         <?php endif; ?>
@@ -61,11 +61,11 @@ unset($_SESSION['flash']);
         </nav>
 
         <div class="sidebar-foot">
-            <a class="sidebar-link<?= $requestPath === '/admin/account' ? ' is-active' : '' ?>" href="/admin/account"><?= AdminNav::icon('person') ?><span>Account</span></a>
-            <a class="sidebar-link" href="/" target="_blank" rel="noopener"><?= AdminNav::icon('open_in_new') ?><span>View student site</span></a>
+            <a class="sidebar-link<?= $requestPath === '/admin/account' ? ' is-active' : '' ?>" href="/admin/account"><?= AdminNav::icon('person') ?><span><?= View::tr('Account') ?></span></a>
+            <a class="sidebar-link" href="/" target="_blank" rel="noopener"><?= AdminNav::icon('open_in_new') ?><span><?= View::tr('View student site') ?></span></a>
             <form method="post" action="/admin/logout">
                 <?= Csrf::field() ?>
-                <button type="submit" class="sidebar-link"><?= AdminNav::icon('logout') ?><span>Log out</span></button>
+                <button type="submit" class="sidebar-link"><?= AdminNav::icon('logout') ?><span><?= View::tr('Log out') ?></span></button>
             </form>
         </div>
     </aside>
@@ -73,8 +73,8 @@ unset($_SESSION['flash']);
 
     <div class="admin-content">
         <header class="admin-topbar">
-            <label for="nav-toggle" class="topbar-menu" aria-label="Open menu"><?= AdminNav::icon('menu') ?></label>
-            <a class="brand" href="/admin">MatHub</a>
+            <label for="nav-toggle" class="topbar-menu" aria-label="<?= View::tr('Open menu') ?>"><?= AdminNav::icon('menu') ?></label>
+            <a class="brand" href="/admin"><?= View::tr('MatHub') ?></a>
         </header>
         <main class="admin-main">
             <?php if (!empty($flash)): ?>
@@ -88,12 +88,12 @@ unset($_SESSION['flash']);
 <?php else: ?>
 <body class="<?= View::e($bodyClass ?? '') ?>">
 <header class="site-header">
-    <a class="brand" href="/">MatHub</a>
+    <a class="brand" href="/"><?= View::tr('MatHub') ?></a>
     <nav>
         <?php if (Auth::isLoggedIn()): ?>
-            <a href="/admin">Teacher panel</a>
+            <a href="/admin"><?= View::tr('Teacher panel') ?></a>
         <?php else: ?>
-            <a href="/admin/login">Teacher login</a>
+            <a href="/admin/login"><?= View::tr('Teacher login') ?></a>
         <?php endif; ?>
     </nav>
 </header>
@@ -104,7 +104,7 @@ unset($_SESSION['flash']);
 <?= $content ?>
 </main>
 <footer class="site-footer">
-    <span>MatHub &mdash; Material Hub</span>
+    <span>MatHub &mdash; <?= View::tr('Material Hub') ?></span>
 </footer>
 </body>
 <?php endif; ?>

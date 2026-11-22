@@ -103,7 +103,7 @@ if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $d
     }
     $payload = json_decode((string)($_POST['payload'] ?? ''), true);
     if (!is_array($payload)) {
-        jsonResponse(['ok' => false, 'error' => 'Bad request.'], 400);
+        jsonResponse(['ok' => false, 'error' => I18n::ui('Bad request.')], 400);
     }
     try {
         Exams::submit($classSlug, $examId, $sid, $payload, $_FILES);

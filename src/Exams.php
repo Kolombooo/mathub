@@ -97,7 +97,7 @@ final class Exams
     {
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Exam content title cannot be empty.');
+            throw new StorageException(I18n::ui('Exam content title cannot be empty.'));
         }
         $base = Storage::slugify($title);
         $id = $base;
@@ -119,11 +119,11 @@ final class Exams
     {
         $c = self::getContent($id);
         if ($c === null) {
-            throw new StorageException('Exam content not found.');
+            throw new StorageException(I18n::ui('Exam content not found.'));
         }
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Exam content title cannot be empty.');
+            throw new StorageException(I18n::ui('Exam content title cannot be empty.'));
         }
         $c['title'] = mb_substr($title, 0, 200);
         $c['questions'] = self::normalizeQuestions($rawQuestions);
@@ -143,7 +143,7 @@ final class Exams
             return;
         }
         if (self::contentUsage($id)) {
-            throw new StorageException('This exam content is used by an exam. Detach or delete those exams first.');
+            throw new StorageException(I18n::ui('This exam content is used by an exam. Detach or delete those exams first.'));
         }
         @unlink(self::contentsDir() . '/' . $id . '.json');
     }
@@ -281,13 +281,13 @@ final class Exams
     {
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Exam title cannot be empty.');
+            throw new StorageException(I18n::ui('Exam title cannot be empty.'));
         }
         if ($lesson === null) {
-            throw new StorageException('Choose the lesson this exam belongs to.');
+            throw new StorageException(I18n::ui('Choose the lesson this exam belongs to.'));
         }
         if ($contentId !== null && $contentId !== '' && self::getContent($contentId) === null) {
-            throw new StorageException('Exam content not found.');
+            throw new StorageException(I18n::ui('Exam content not found.'));
         }
         $base = Storage::slugify($title);
         $id = $base;
@@ -327,32 +327,32 @@ final class Exams
     {
         $exam = self::rawExam($classSlug, $examId);
         if ($exam === null) {
-            throw new StorageException('Exam not found.');
+            throw new StorageException(I18n::ui('Exam not found.'));
         }
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Exam title cannot be empty.');
+            throw new StorageException(I18n::ui('Exam title cannot be empty.'));
         }
         if ($lesson === null) {
-            throw new StorageException('Choose the lesson this exam belongs to.');
+            throw new StorageException(I18n::ui('Choose the lesson this exam belongs to.'));
         }
         $code = self::normalizeCode($code);
         if (mb_strlen($code) < 4 || mb_strlen($code) > 40) {
-            throw new StorageException('The exam code must be 4 to 40 characters.');
+            throw new StorageException(I18n::ui('The exam code must be 4 to 40 characters.'));
         }
         $owner = self::findByCode($code);
         if ($owner !== null && !($owner['classSlug'] === $classSlug && $owner['id'] === $examId)) {
-            throw new StorageException('That code is already used by another exam.');
+            throw new StorageException(I18n::ui('That code is already used by another exam.'));
         }
         if ($contentId !== '' && self::getContent($contentId) === null) {
-            throw new StorageException('Exam content not found.');
+            throw new StorageException(I18n::ui('Exam content not found.'));
         }
         $newContent = $contentId !== '' ? $contentId : null;
         if ($newContent !== ($exam['contentId'] ?? null) && !empty($exam['contentId']) && self::submissionCount($classSlug, $examId) > 0) {
-            throw new StorageException('This exam already has submissions, so its content cannot be changed. Create a new exam instead.');
+            throw new StorageException(I18n::ui('This exam already has submissions, so its content cannot be changed. Create a new exam instead.'));
         }
         if ($published && $newContent === null) {
-            throw new StorageException('Select an exam content before publishing.');
+            throw new StorageException(I18n::ui('Select an exam content before publishing.'));
         }
         $exam['title'] = $title;
         $exam['published'] = $published;
@@ -536,7 +536,7 @@ final class Exams
         $first = mb_substr(trim($first), 0, 80);
         $last = mb_substr(trim($last), 0, 80);
         if ($dir === null || $first === '' || $last === '') {
-            throw new StorageException('Name and surname are required.');
+            throw new StorageException(I18n::ui('Name and surname are required.'));
         }
         $sid = bin2hex(random_bytes(10));
         self::writeJson($dir . '/submissions/' . $sid . '.json', [
@@ -572,7 +572,7 @@ final class Exams
     {
         $dir = self::examDir($classSlug, $examId);
         if ($dir === null || !self::validSid((string)$sub['id'])) {
-            throw new StorageException('Invalid submission.');
+            throw new StorageException(I18n::ui('Invalid submission.'));
         }
         self::writeJson($dir . '/submissions/' . $sub['id'] . '.json', $sub);
     }
@@ -619,10 +619,10 @@ final class Exams
         $exam = self::getExam($classSlug, $examId);
         $sub = self::getSubmission($classSlug, $examId, $sid);
         if ($exam === null || $sub === null) {
-            throw new StorageException('Unknown submission.');
+            throw new StorageException(I18n::ui('Unknown submission.'));
         }
         if ($sub['status'] !== 'working') {
-            throw new StorageException('This exam was already submitted.');
+            throw new StorageException(I18n::ui('This exam was already submitted.'));
         }
 
         $raw = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
@@ -691,18 +691,19 @@ final class Exams
     {
         $d = json_decode((string)($e['detail'] ?? ''), true) ?: [];
         $dur = isset($d['durationSec']) ? sprintf('%d:%02d', intdiv((int)$d['durationSec'], 60), (int)$d['durationSec'] % 60) : null;
+        $time = $dur ?? '?';
         switch ($e['type']) {
             case 'left_page':
-                $how = ($d['reason'] ?? '') === 'hidden' ? 'tab switched / window minimised' : 'window lost focus';
-                return ['Left the exam page (' . $how . ') for ' . ($dur ?? '?'), true];
+                $how = ($d['reason'] ?? '') === 'hidden' ? I18n::ui('tab switched / window minimised') : I18n::ui('window lost focus');
+                return [I18n::ui('Left the exam page ({how}) for {time}', ['how' => $how, 'time' => $time]), true];
             case 'fullscreen_exit':
-                return ['Exited fullscreen for ' . ($dur ?? '?'), true];
+                return [I18n::ui('Exited fullscreen for {time}', ['time' => $time]), true];
             case 'page_closed':
-                return ['Closed or reloaded the page / browser', true];
+                return [I18n::ui('Closed or reloaded the page / browser'), true];
             case 'page_reopened':
-                return ['Reopened the exam after being gone ' . ($dur ?? '?'), true];
+                return [I18n::ui('Reopened the exam after being gone {time}', ['time' => $time]), true];
             case 'fullscreen_unsupported':
-                return ['Browser does not support fullscreen', false];
+                return [I18n::ui('Browser does not support fullscreen'), false];
         }
         return [$e['type'], false];
     }
@@ -760,20 +761,20 @@ final class Exams
             return null;
         }
         if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] > self::MAX_FILE_BYTES) {
-            throw new StorageException('A file is too large or failed to upload.');
+            throw new StorageException(I18n::ui('A file is too large or failed to upload.'));
         }
         $originalName = mb_substr(basename((string)$file['name']), 0, 150);
         if ($q['type'] === 'draw') {
             $info = @getimagesize($file['tmp_name']);
             if ($info === false || $info[2] !== IMAGETYPE_PNG) {
-                throw new StorageException('Invalid drawing.');
+                throw new StorageException(I18n::ui('Invalid drawing.'));
             }
             $ext = 'png';
             $originalName = 'drawing.png';
         } else {
             $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
             if (!in_array($ext, self::UPLOAD_EXT, true)) {
-                throw new StorageException('File type not allowed: .' . $ext);
+                throw new StorageException(I18n::ui('File type not allowed: .{ext}', ['ext' => $ext]));
             }
         }
         $dir = self::examDir($classSlug, $examId) . '/files/' . $sid;
@@ -782,7 +783,7 @@ final class Exams
         }
         $stored = $q['id'] . '.' . $ext;
         if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $stored)) {
-            throw new StorageException('Failed to store file.');
+            throw new StorageException(I18n::ui('Failed to store file.'));
         }
         return ['file' => $stored, 'name' => $originalName];
     }

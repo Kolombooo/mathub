@@ -13,7 +13,7 @@ if (count($decoded) === 2 && $method === 'GET') {
             $usage[$e['contentId']] = ($usage[$e['contentId']] ?? 0) + 1;
         }
     }
-    View::render('admin/exam_contents', ['title' => 'Exam content library', 'contents' => Exams::listContents(), 'usage' => $usage]);
+    View::render('admin/exam_contents', ['title' => I18n::ui('Exam content library'), 'contents' => Exams::listContents(), 'usage' => $usage]);
     exit;
 }
 
@@ -50,7 +50,7 @@ if (count($decoded) === 4 && $decoded[3] === 'save' && $method === 'POST') {
     $questions = json_decode((string)($_POST['questions'] ?? '[]'), true);
     try {
         Exams::saveContent($contentId, (string)($_POST['title'] ?? ''), is_array($questions) ? $questions : []);
-        flash('success', 'Exam content saved.');
+        flash('success', I18n::ui('Exam content saved.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -60,7 +60,7 @@ if (count($decoded) === 4 && $decoded[3] === 'save' && $method === 'POST') {
 if (count($decoded) === 4 && $decoded[3] === 'duplicate' && $method === 'POST') {
     requireCsrf();
     $copy = Exams::createContent($content['title'] . ' (copy)', $content['questions']);
-    flash('success', 'Exam content duplicated.');
+    flash('success', I18n::ui('Exam content duplicated.'));
     redirect('/admin/exam-contents/' . rawurlencode($copy));
 }
 
@@ -68,7 +68,7 @@ if (count($decoded) === 4 && $decoded[3] === 'delete' && $method === 'POST') {
     requireCsrf();
     try {
         Exams::deleteContent($contentId);
-        flash('success', 'Exam content deleted.');
+        flash('success', I18n::ui('Exam content deleted.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
         redirect($contentBase);

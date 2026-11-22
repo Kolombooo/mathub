@@ -1,10 +1,14 @@
 document.addEventListener('DOMContentLoaded', function () {
+    var i18nNode = document.getElementById('admin-i18n');
+    var I18N = i18nNode ? (JSON.parse(i18nNode.textContent) || {}) : {};
+    function t(key, fallback) { return I18N['admin_js.' + key] || fallback; }
+
     // Copy-to-clipboard for uploaded file URLs
     document.querySelectorAll('.copy-url').forEach(function (btn) {
         btn.addEventListener('click', function () {
             navigator.clipboard.writeText(btn.dataset.url).then(function () {
                 var original = btn.textContent;
-                btn.textContent = 'Copied!';
+                btn.textContent = t('copied', 'Copied!');
                 setTimeout(function () { btn.textContent = original; }, 1200);
             });
         });
@@ -33,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // image while editing; it never reaches the public page.
     var editor = new toastui.Editor({
         el: editorHost,
+        language: window.MATHUB_EDITOR_LANG || 'en-US',
         height: '100%',
         initialEditType: 'wysiwyg',
         previewStyle: 'vertical',
@@ -43,10 +48,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (data.ok) {
                         callback(data.url, blob.name || 'image');
                     } else {
-                        alert(data.error || 'Upload failed');
+                        alert(data.error || t('upload_failed', 'Upload failed'));
                     }
                 }).catch(function () {
-                    alert('Upload failed');
+                    alert(t('upload_failed', 'Upload failed'));
                 });
             }
         }
@@ -144,10 +149,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.ok) {
                 editor.insertText('[' + file.name + '](' + data.url + ')');
             } else {
-                alert(data.error || 'Upload failed');
+                alert(data.error || t('upload_failed', 'Upload failed'));
             }
         }).catch(function () {
-            alert('Upload failed');
+            alert(t('upload_failed', 'Upload failed'));
         });
         fileInput.value = '';
     });

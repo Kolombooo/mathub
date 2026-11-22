@@ -87,7 +87,7 @@ final class Storage
     {
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Class name cannot be empty.');
+            throw new StorageException(I18n::ui('Class name cannot be empty.'));
         }
         $root = Config::contentDir();
         if (!is_dir($root)) {
@@ -103,11 +103,11 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Class not found.');
+            throw new StorageException(I18n::ui('Class not found.'));
         }
         $newTitle = trim($newTitle);
         if ($newTitle === '') {
-            throw new StorageException('Class name cannot be empty.');
+            throw new StorageException(I18n::ui('Class name cannot be empty.'));
         }
         $meta = self::readJson($dir . '/meta.json');
         $meta['title'] = $newTitle;
@@ -133,10 +133,10 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Class not found.');
+            throw new StorageException(I18n::ui('Class not found.'));
         }
         if (!I18n::isAvailable($lang)) {
-            throw new StorageException('Unknown language.');
+            throw new StorageException(I18n::ui('Unknown language.'));
         }
         $meta = self::readJson($dir . '/meta.json');
         $meta['lang'] = $lang;
@@ -186,11 +186,11 @@ final class Storage
     {
         $classDir = Config::contentDir() . '/' . $classSlug;
         if (!is_dir($classDir)) {
-            throw new StorageException('Class not found.');
+            throw new StorageException(I18n::ui('Class not found.'));
         }
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Topic name cannot be empty.');
+            throw new StorageException(I18n::ui('Topic name cannot be empty.'));
         }
         $slug = self::uniqueSlug(self::slugify($title), $classDir);
         mkdir($classDir . '/' . $slug, 0775, true);
@@ -203,11 +203,11 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug . '/' . $topicSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Topic not found.');
+            throw new StorageException(I18n::ui('Topic not found.'));
         }
         $newTitle = trim($newTitle);
         if ($newTitle === '') {
-            throw new StorageException('Topic name cannot be empty.');
+            throw new StorageException(I18n::ui('Topic name cannot be empty.'));
         }
         $meta = self::readJson($dir . '/meta.json');
         $meta['title'] = $newTitle;
@@ -231,10 +231,10 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug . '/' . $topicSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Topic not found.');
+            throw new StorageException(I18n::ui('Topic not found.'));
         }
         if (!I18n::isAvailable($lang)) {
-            throw new StorageException('Unknown language.');
+            throw new StorageException(I18n::ui('Unknown language.'));
         }
         $meta = self::readJson($dir . '/meta.json');
         $meta['lang'] = $lang;
@@ -315,11 +315,11 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug . '/' . $topicSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Topic not found.');
+            throw new StorageException(I18n::ui('Topic not found.'));
         }
         $title = trim($title);
         if ($title === '') {
-            throw new StorageException('Title cannot be empty.');
+            throw new StorageException(I18n::ui('Title cannot be empty.'));
         }
 
         $isNew = $materialSlug === null || !is_file($dir . '/' . $materialSlug . '.md');
@@ -368,7 +368,7 @@ final class Storage
     {
         $dir = Config::contentDir() . '/' . $classSlug . '/' . $topicSlug;
         if (!is_dir($dir)) {
-            throw new StorageException('Topic not found.');
+            throw new StorageException(I18n::ui('Topic not found.'));
         }
         $meta = self::readJson($dir . '/meta.json');
         $meta['order'] = array_values($slugOrder);
@@ -388,7 +388,7 @@ final class Storage
 
         $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
         if (!in_array($ext, self::ALLOWED_UPLOAD_EXT, true)) {
-            throw new StorageException('File type not allowed: .' . $ext);
+            throw new StorageException(I18n::ui('File type not allowed: .{ext}', ['ext' => $ext]));
         }
 
         $base = self::slugify(pathinfo($originalName, PATHINFO_FILENAME));
@@ -400,7 +400,7 @@ final class Storage
         }
 
         if (!move_uploaded_file($tmpPath, $dir . '/' . $filename)) {
-            throw new StorageException('Failed to save uploaded file.');
+            throw new StorageException(I18n::ui('Failed to save uploaded file.'));
         }
 
         return [
