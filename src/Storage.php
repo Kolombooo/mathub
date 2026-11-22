@@ -164,7 +164,29 @@ final class Storage
             $out[] = ['slug' => $entry, 'title' => $meta['title'] ?? $entry];
         }
         usort($out, fn($a, $b) => strcasecmp($a['title'], $b['title']));
+
+        // Apply custom order (topics not listed fall back to alphabetical, after the ordered ones).
+        $meta = self::readJson($classDir . '/meta.json');
+        $order = array_flip($meta['topicOrder'] ?? []);
+        if ($order) {
+            usort($out, function ($a, $b) use ($order) {
+                $ia = $order[$a['slug']] ?? PHP_INT_MAX;
+                $ib = $order[$b['slug']] ?? PHP_INT_MAX;
+                return $ia <=> $ib;
+            });
+        }
         return $out;
+    }
+
+    public static function reorderTopics(string $classSlug, array $slugOrder): void
+    {
+        $dir = Config::contentDir() . '/' . $classSlug;
+        if (!is_dir($dir)) {
+            throw new StorageException(I18n::ui('Class not found.'));
+        }
+        $meta = self::readJson($dir . '/meta.json');
+        $meta['topicOrder'] = array_values($slugOrder);
+        self::writeJson($dir . '/meta.json', $meta);
     }
 
     public static function topicExists(string $classSlug, string $topicSlug): bool
@@ -422,6 +444,7 @@ final class Storage
             }
             $out[] = [
                 'filename' => $entry,
+                'size' => (int)filesize($dir . '/' . $entry),
                 'url' => '/media/' . rawurlencode($classSlug) . '/' . rawurlencode($topicSlug) . '/' . rawurlencode($entry),
             ];
         }
