@@ -59,7 +59,16 @@ if (count($decoded) === 4 && $decoded[3] === 'save' && $method === 'POST') {
 
 if (count($decoded) === 4 && $decoded[3] === 'duplicate' && $method === 'POST') {
     requireCsrf();
-    $copy = Exams::createContent($content['title'] . ' (copy)', $content['questions']);
+    $newTitle = trim((string)($_POST['title'] ?? ''));
+    if ($newTitle === '') {
+        $newTitle = $content['title'] . ' (copy)';
+    }
+    try {
+        $copy = Exams::createContent(mb_substr($newTitle, 0, 200), $content['questions']);
+    } catch (StorageException $e) {
+        flash('error', $e->getMessage());
+        redirect($contentBase);
+    }
     flash('success', I18n::ui('Exam content duplicated.'));
     redirect('/admin/exam-contents/' . rawurlencode($copy));
 }

@@ -39,22 +39,53 @@
     </div>
 
     <input type="hidden" name="questions" id="questions-json">
-    <div class="form-actions">
-        <button type="submit"><?= View::tr('Save exam content') ?></button>
-        <a href="/admin/exam-contents" class="button-secondary"><?= View::tr('Back') ?></a>
-    </div>
 </form>
 
-<div class="form-actions">
-    <form method="post" action="<?= $cb ?>/duplicate" class="inline-form">
-        <?= Csrf::field() ?>
-        <button type="submit" class="button-secondary"><?= View::tr('Duplicate') ?></button>
-    </form>
+<hr class="editor-divider">
+
+<div class="editor-toolbar" role="toolbar" aria-label="<?= View::tr('Edit exam content') ?>">
+    <button type="submit" form="exam-form" class="icon-btn primary" title="<?= View::tr('Save exam content') ?>" aria-label="<?= View::tr('Save exam content') ?>">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    </button>
+    <a href="/admin/exam-contents" class="icon-btn" title="<?= View::tr('Back') ?>" aria-label="<?= View::tr('Back') ?>">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </a>
+    <span class="toolbar-spacer"></span>
+    <button type="button" class="icon-btn" id="copy-open" title="<?= View::tr('Duplicate') ?>" aria-label="<?= View::tr('Duplicate') ?>">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </button>
     <form method="post" action="<?= $cb ?>/delete" class="inline-form" onsubmit="return confirm(<?= View::jsq('Delete this exam content?') ?>);">
         <?= Csrf::field() ?>
-        <button type="submit" class="danger" <?= $usedBy ? 'disabled title="' . View::tr('Used by an exam') . '"' : '' ?>><?= View::tr('Delete') ?></button>
+        <button type="submit" class="icon-btn danger" <?= $usedBy ? 'disabled title="' . View::tr('Used by an exam') . '"' : 'title="' . View::tr('Delete') . '"' ?> aria-label="<?= View::tr('Delete') ?>">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
     </form>
 </div>
+
+<dialog id="copy-dialog" class="copy-dialog">
+    <form method="post" action="<?= $cb ?>/duplicate">
+        <?= Csrf::field() ?>
+        <label><?= View::tr('Name of the copy') ?>
+            <input type="text" name="title" value="<?= View::e($content['title'] . ' (copy)') ?>" maxlength="200" required>
+        </label>
+        <div class="modal-actions">
+            <button type="button" class="button-secondary" id="copy-cancel"><?= View::tr('Cancel') ?></button>
+            <button type="submit"><?= View::tr('Create copy') ?></button>
+        </div>
+    </form>
+</dialog>
+<script>
+(function () {
+    var d = document.getElementById('copy-dialog');
+    document.getElementById('copy-open').addEventListener('click', function () {
+        d.showModal();
+        var i = d.querySelector('input[name=title]');
+        i.focus(); i.select();
+    });
+    document.getElementById('copy-cancel').addEventListener('click', function () { d.close(); });
+    d.addEventListener('click', function (e) { if (e.target === d) d.close(); });
+})();
+</script>
 
 <script type="application/json" id="exam-data"><?= json_encode($content['questions'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script type="application/json" id="builder-i18n"><?= json_encode(I18n::group(I18n::defaultLang(), 'builder.'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
