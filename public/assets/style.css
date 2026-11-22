@@ -651,3 +651,66 @@ fieldset.settings legend { font-weight: 600; padding: 0 0.4rem; }
 .dialog-overlay { z-index: 15000; }
 .modal.dialog { max-width: 420px; padding: 1.25rem 1.5rem; }
 .dialog-text { margin: 0 0 1rem; white-space: pre-wrap; }
+
+/* ---------- Material editor: fullscreen, Google Docs look ---------- */
+.page-doc-editor { background: #f9fbfd; overflow: hidden; }
+.page-doc-editor .sidebar,
+.page-doc-editor .sidebar-scrim,
+.page-doc-editor .admin-topbar { display: none; }
+.page-doc-editor .admin-shell { display: block; min-height: 0; }
+.page-doc-editor .admin-main { max-width: none; margin: 0; padding: 0; }
+.page-doc-editor .flash { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 50; }
+
+.doc-form { position: fixed; inset: 0; display: flex; flex-direction: column; margin: 0; background: #f9fbfd; }
+.doc-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; background: #f9fbfd; flex: none;
+}
+.doc-back {
+    width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%; color: var(--text-secondary); font-size: 22px; text-decoration: none; flex: none;
+}
+.doc-back:hover { background: #e9eef6; text-decoration: none; }
+.doc-heading { flex: 1; min-width: 0; }
+.doc-title {
+    display: block; width: 100%; max-width: 480px; margin: 0; padding: 2px 8px;
+    font-size: 18px; line-height: 1.4; color: var(--text);
+    background: transparent; border: 1px solid transparent; border-radius: 4px;
+}
+.doc-title:hover { border-color: #c7c7c7; }
+.doc-title:focus { border-color: #1a73e8; outline: none; box-shadow: none; background: #fff; }
+.doc-crumbs { padding: 0 9px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-header .button-secondary { border-radius: 20px; margin: 0; white-space: nowrap; }
+.doc-save { margin: 0; border-radius: 20px; padding: 8px 24px; background: #0b57d0; border-color: #0b57d0; }
+.doc-save:hover { background: #0a4cb8; }
+
+.doc-form #editor { flex: 1; min-height: 0; margin: 0; }
+.doc-form .toastui-editor-defaultUI { border: none; background: transparent; height: 100%; }
+.doc-form .toastui-editor-defaultUI-toolbar {
+    margin: 0 16px; border: none; border-radius: 28px; background: #edf2fa;
+    height: auto; padding: 4px 12px; flex: none;
+}
+.doc-form .toastui-editor-main { background: #f9fbfd; }
+.doc-form .toastui-editor-main-container { background: transparent; }
+.doc-form .toastui-editor-ww-container,
+.doc-form .toastui-editor-md-container { background: transparent; }
+.doc-form .toastui-editor-ww-container .toastui-editor { background: transparent; }
+.doc-form .toastui-editor-ww-container .toastui-editor-contents,
+.doc-form .ProseMirror {
+    box-sizing: border-box;
+    min-height: 100%;
+}
+.doc-form .toastui-editor-ww-container .ProseMirror {
+    width: 816px; max-width: calc(100% - 32px);
+    margin: 16px auto; padding: 72px 96px;
+    min-height: 1056px; background: #fff;
+    border: 1px solid #d3e3fd; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
+    font-size: 15px; line-height: 1.6;
+}
+.doc-form .toastui-editor-ww-container .ProseMirror { overflow: visible; }
+.doc-form .toastui-editor-md-container .toastui-editor-md-preview { background: #fff; }
+.doc-form .toastui-editor-mode-switch { background: #f9fbfd; border-top: 1px solid #e1e3e1; }
+@media (max-width: 860px) {
+    .doc-header { flex-wrap: wrap; padding: 8px; }
+    .doc-form .toastui-editor-ww-container .ProseMirror { padding: 32px 20px; min-height: 80vh; }
+}

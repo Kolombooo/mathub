@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // image while editing; it never reaches the public page.
     var editor = new toastui.Editor({
         el: editorHost,
-        height: '500px',
+        height: '100%',
         initialEditType: 'wysiwyg',
         previewStyle: 'vertical',
         initialValue: bodyField.value || '',
