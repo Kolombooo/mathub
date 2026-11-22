@@ -155,11 +155,11 @@ A restrained palette: one muted blue, cool neutrals, and three status hues used 
 
 ## Typography
 
-**Display Font:** Hanken Grotesk (with Figtree, then system sans-serif)
+**Display Font:** Hanken Grotesk, self-hosted as a variable font (`public/assets/fonts`, latin and latin-ext subsets), with system sans-serif fallback
 **Body Font:** Hanken Grotesk (same family)
 **Label/Mono Font:** none distinct; labels are Hanken Grotesk at 14px semibold.
 
-**Character:** A single clear, slightly humanist grotesk. Hierarchy comes from weight (300 to 700) and size, not from pairing. Figtree is requested at 400 and 500 only as a fallback.
+**Character:** A single clear, slightly humanist grotesk. Hierarchy comes from weight (300 to 700) and size, not from pairing. No third-party font requests are made.
 
 ### Hierarchy
 - **Display** (700, 36px, 1.25; 28px under 860px width): page titles (h1).

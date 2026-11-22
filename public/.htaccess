@@ -10,3 +10,15 @@ RewriteRule ^ index.php [QSA,L]
     php_value post_max_size 64M
     php_value max_file_uploads 30
 </IfModule>
+
+# Compress text assets and let browsers keep static files. Asset URLs carry
+# ?v=<mtime> (View::asset), so a changed file always gets a new URL and the
+# long lifetime is safe. Fonts never change under the same name.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js|woff2)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
