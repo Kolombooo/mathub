@@ -684,32 +684,46 @@ fieldset.settings legend { font-weight: 600; padding: 0 0.4rem; }
 .doc-save { margin: 0; border-radius: 20px; padding: 8px 24px; background: #0b57d0; border-color: #0b57d0; }
 .doc-save:hover { background: #0a4cb8; }
 
-.doc-form #editor { flex: 1; min-height: 0; margin: 0; }
-.doc-form .toastui-editor-defaultUI { border: none; background: transparent; height: 100%; }
+.doc-form textarea[hidden] { display: none; }
+.doc-form #editor { flex: 1; min-height: 0; margin: 0; position: relative; }
+.doc-form #editor > .toastui-editor-defaultUI {
+    position: absolute; inset: 0; height: auto !important;
+    display: flex; flex-direction: column; border: none; background: transparent;
+}
+/* Neutralise the global button styles inside Toast UI (blue fill, 40px height) */
+.doc-form .toastui-editor-defaultUI button {
+    min-height: 0; padding: 0; gap: 0; box-shadow: none; transition: none;
+    font: inherit; color: inherit; border-radius: 4px;
+}
+.doc-form .toastui-editor-defaultUI button:focus-visible { box-shadow: none; outline: 2px solid #0b57d0; }
+.doc-form .toastui-editor-toolbar-icons,
+.doc-form .toastui-editor-toolbar-icons:hover,
+.doc-form .toastui-editor-defaultUI button.toastui-editor-toolbar-icons { background-color: transparent; border-color: transparent; }
+.doc-form .toastui-editor-toolbar-icons:hover { background-color: #dde3ea; }
+.doc-form .toastui-editor-toolbar-icons.active { background-color: #d3e3fd; }
 .doc-form .toastui-editor-defaultUI-toolbar {
     margin: 0 16px; border: none; border-radius: 28px; background: #edf2fa;
     height: auto; padding: 4px 12px; flex: none;
 }
-.doc-form .toastui-editor-main { background: #f9fbfd; }
-.doc-form .toastui-editor-main-container { background: transparent; }
+.doc-form .toastui-editor-main { flex: 1; min-height: 0; background: #f9fbfd; }
+.doc-form .toastui-editor-main-container,
 .doc-form .toastui-editor-ww-container,
-.doc-form .toastui-editor-md-container { background: transparent; }
-.doc-form .toastui-editor-ww-container .toastui-editor { background: transparent; }
+.doc-form .toastui-editor-ww-container > .toastui-editor,
+.doc-form .toastui-editor-md-container,
+.doc-form .toastui-editor-md-container > .toastui-editor { height: 100%; background: transparent; }
+.doc-form .toastui-editor-ww-container { overflow-y: auto; }
 .doc-form .toastui-editor-ww-container .toastui-editor-contents,
-.doc-form .ProseMirror {
-    box-sizing: border-box;
-    min-height: 100%;
-}
+.doc-form .toastui-editor-ww-container .ProseMirror { height: auto; min-height: 0; overflow: visible; }
 .doc-form .toastui-editor-ww-container .ProseMirror {
+    box-sizing: border-box;
     width: 816px; max-width: calc(100% - 32px);
     margin: 16px auto; padding: 72px 96px;
     min-height: 1056px; background: #fff;
-    border: 1px solid #d3e3fd; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
+    border: none; box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
     font-size: 15px; line-height: 1.6;
 }
-.doc-form .toastui-editor-ww-container .ProseMirror { overflow: visible; }
 .doc-form .toastui-editor-md-container .toastui-editor-md-preview { background: #fff; }
-.doc-form .toastui-editor-mode-switch { background: #f9fbfd; border-top: 1px solid #e1e3e1; }
+.doc-form .toastui-editor-mode-switch { background: #f9fbfd; border-top: 1px solid #e1e3e1; flex: none; }
 @media (max-width: 860px) {
     .doc-header { flex-wrap: wrap; padding: 8px; }
     .doc-form .toastui-editor-ww-container .ProseMirror { padding: 32px 20px; min-height: 80vh; }
