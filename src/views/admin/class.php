@@ -29,11 +29,21 @@
     <p class="empty"><?= View::tr('No topics yet. Add one above.') ?></p>
 <?php else: ?>
     <ul class="manage-list">
-        <?php foreach ($topics as $topic): ?>
+        <?php foreach ($topics as $i => $topic): ?>
             <?php $topicUrl = $base . '/topics/' . rawurlencode($topic['slug']); ?>
             <li>
                 <a href="<?= $topicUrl ?>"><?= View::e($topic['title']) ?></a>
                 <span class="actions">
+                    <form method="post" action="<?= $topicUrl ?>/move" class="inline-form">
+                        <?= Csrf::field() ?>
+                        <input type="hidden" name="direction" value="up">
+                        <button type="submit" class="button-secondary small" <?= $i === 0 ? 'disabled' : '' ?>>&uarr;</button>
+                    </form>
+                    <form method="post" action="<?= $topicUrl ?>/move" class="inline-form">
+                        <?= Csrf::field() ?>
+                        <input type="hidden" name="direction" value="down">
+                        <button type="submit" class="button-secondary small" <?= $i === count($topics) - 1 ? 'disabled' : '' ?>>&darr;</button>
+                    </form>
                     <a href="<?= $topicUrl ?>"><?= View::tr('Open') ?></a>
                     <details class="menu">
                         <summary aria-label="<?= View::tr('Topic actions') ?>"><?= AdminNav::icon('more_vert') ?></summary>

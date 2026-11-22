@@ -63,6 +63,7 @@
         <?php foreach ($uploads as $upload): ?>
             <li>
                 <a href="<?= View::e($upload['url']) ?>" target="_blank"><?= View::e($upload['filename']) ?></a>
+                <span class="item-meta"><?= View::e(View::fileSize($upload['size'])) ?></span>
                 <span class="actions">
                     <button type="button" class="copy-url button-secondary small" data-url="<?= View::e($upload['url']) ?>"><?= View::tr('Copy URL') ?></button>
                     <form method="post" action="/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>/uploads/<?= rawurlencode($upload['filename']) ?>/delete" class="inline-form" onsubmit="return confirm(<?= View::jsq('Delete this file?') ?>);">

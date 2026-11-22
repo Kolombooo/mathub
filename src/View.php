@@ -33,6 +33,22 @@ final class View
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
 
+    /** Human-readable file size, e.g. "1.4 MB". */
+    public static function fileSize(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes . ' B';
+        }
+        $units = ['KB', 'MB', 'GB'];
+        $value = $bytes / 1024;
+        $i = 0;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+        return number_format($value, $value < 10 ? 1 : 0, '.', '') . ' ' . $units[$i];
+    }
+
     /** Translated string as a JS string literal, safe inside an HTML attribute (e.g. onsubmit="return confirm(...)"). */
     public static function jsq(string $text, array $params = []): string
     {

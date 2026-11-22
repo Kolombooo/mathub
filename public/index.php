@@ -314,6 +314,21 @@ if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug));
 }
 
+if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes' && $decoded[3] === 'topics' && $decoded[5] === 'move' && $method === 'POST') {
+    requireCsrf();
+    [, , $classSlug, , $topicSlug] = $decoded;
+    $slugs = array_column(Storage::listTopics($classSlug), 'slug');
+    $index = array_search($topicSlug, $slugs, true);
+    if ($index !== false) {
+        $swapWith = ($_POST['direction'] ?? '') === 'up' ? $index - 1 : $index + 1;
+        if ($swapWith >= 0 && $swapWith < count($slugs)) {
+            [$slugs[$index], $slugs[$swapWith]] = [$slugs[$swapWith], $slugs[$index]];
+            Storage::reorderTopics($classSlug, $slugs);
+        }
+    }
+    redirect('/admin/classes/' . rawurlencode($classSlug));
+}
+
 if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes' && $decoded[3] === 'topics' && $decoded[5] === 'delete' && $method === 'POST') {
     requireCsrf();
     [, , $classSlug, , $topicSlug] = $decoded;
