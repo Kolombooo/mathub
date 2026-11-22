@@ -335,6 +335,7 @@ if (count($decoded) === 7 && $decoded[5] === 'materials' && $decoded[6] === 'new
     }
     View::render('admin/material_edit', [
         'title' => 'New material',
+        'bodyClass' => 'page-doc-editor',
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'topicSlug' => $topicSlug,
@@ -358,6 +359,7 @@ if (count($decoded) === 8 && $decoded[5] === 'materials' && $decoded[7] === 'edi
     $body = preg_replace('/^#\s+.*\r?\n\r?\n?/', '', $content, 1);
     View::render('admin/material_edit', [
         'title' => 'Edit material',
+        'bodyClass' => 'page-doc-editor',
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'topicSlug' => $topicSlug,

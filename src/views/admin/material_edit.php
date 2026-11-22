@@ -1,27 +1,21 @@
-<p class="breadcrumbs">
-    <a href="/admin">Admin</a> &rsaquo;
-    <a href="/admin/classes/<?= rawurlencode($classSlug) ?>"><?= View::e($classTitle) ?></a> &rsaquo;
-    <a href="/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>"><?= View::e($topicTitle) ?></a>
-</p>
-<h1><?= $materialSlug ? 'Edit material' : 'New material' ?></h1>
-
-<form method="post" action="/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>/materials/save" id="material-form">
+<?php $topicUrl = '/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug); ?>
+<form method="post" action="<?= $topicUrl ?>/materials/save" id="material-form" class="doc-form">
     <?= Csrf::field() ?>
     <?php if ($materialSlug): ?>
         <input type="hidden" name="material_slug" value="<?= View::e($materialSlug) ?>">
     <?php endif; ?>
-    <label>Title
-        <input type="text" name="title" id="material-title" value="<?= View::e($materialTitle) ?>" required>
-    </label>
-    <div class="editor-toolbar-extra">
-        <button type="button" id="attach-file-btn" class="button-secondary">📎 Attach PDF / file</button>
-    </div>
+    <header class="doc-header">
+        <a class="doc-back" href="<?= $topicUrl ?>" title="Back to <?= View::e($topicTitle) ?>" aria-label="Back">&#8592;</a>
+        <div class="doc-heading">
+            <input type="text" name="title" id="material-title" class="doc-title" value="<?= View::e($materialTitle) ?>" placeholder="Untitled material" aria-label="Title" required>
+            <div class="doc-crumbs"><?= View::e($classTitle) ?> &rsaquo; <?= View::e($topicTitle) ?></div>
+        </div>
+        <button type="button" id="attach-file-btn" class="button-secondary">📎 Attach file</button>
+        <a href="<?= $topicUrl ?>" class="button-secondary">Cancel</a>
+        <button type="submit" class="doc-save">Save</button>
+    </header>
     <div id="editor"></div>
     <textarea name="body" id="material-body" hidden><?= View::e($body) ?></textarea>
-    <div class="form-actions">
-        <button type="submit">Save material</button>
-        <a href="/admin/classes/<?= rawurlencode($classSlug) ?>/topics/<?= rawurlencode($topicSlug) ?>" class="button-secondary">Cancel</a>
-    </div>
 </form>
 
 <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
