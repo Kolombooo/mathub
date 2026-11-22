@@ -102,7 +102,7 @@ if (count($decoded) === 6 && $decoded[5] === 'save' && $method === 'POST') {
             $examId,
             (string)($_POST['title'] ?? ''),
             !empty($_POST['published']),
-            ['monitor' => !empty($_POST['monitor']), 'fullscreen' => !empty($_POST['fullscreen'])],
+            ['monitor' => !empty($_POST['monitor']), 'fullscreen' => !empty($_POST['fullscreen']), 'timeLimitMin' => (int)($_POST['time_limit'] ?? 0)],
             Exams::parseLesson($classSlug, (string)($_POST['lesson'] ?? '')),
             (string)($_POST['content_id'] ?? ''),
             $code
@@ -165,18 +165,22 @@ if (count($decoded) >= 7 && $decoded[5] === 'submissions') {
             // points so teachers can award bonus points.
             $scores[$q['id']] = $v !== '' && is_numeric($v) ? round((float)$v, 2) : null;
         }
-        $sub['scores'] = $scores;
-        $sub['comment'] = mb_substr((string)($_POST['comment'] ?? ''), 0, 5000);
         $action = (string)($_POST['action'] ?? 'save');
-        if ($sub['status'] !== 'working') {
-            if ($action === 'mark') {
-                $sub['status'] = 'marked';
-                $sub['markedAt'] = time();
-            } elseif ($action === 'unmark') {
-                $sub['status'] = 'submitted';
+        $comment = mb_substr((string)($_POST['comment'] ?? ''), 0, 5000);
+        // Locked read-modify-write: a late beacon/heartbeat cannot be lost or overwrite the marks.
+        Exams::mutateSubmission($classSlug, $examId, $sid, function (array $sub) use ($scores, $comment, $action): array {
+            $sub['scores'] = $scores;
+            $sub['comment'] = $comment;
+            if ($sub['status'] !== 'working') {
+                if ($action === 'mark') {
+                    $sub['status'] = 'marked';
+                    $sub['markedAt'] = time();
+                } elseif ($action === 'unmark') {
+                    $sub['status'] = 'submitted';
+                }
             }
-        }
-        Exams::saveSubmission($classSlug, $examId, $sub);
+            return $sub;
+        });
         flash('success', $action === 'mark' ? I18n::ui('Saved and marked.') : I18n::ui('Saved.'));
         redirect($action === 'mark' ? $examBase . '/submissions' : $subBase);
     }

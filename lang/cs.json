@@ -305,5 +305,13 @@
     "— choose a lesson —": "— vyberte lekci —",
     "— choose later —": "— vyberte později —",
     "— none —": "— žádný —",
-    "📎 Attach file": "📎 Přiložit soubor"
+    "📎 Attach file": "📎 Přiložit soubor",
+    "exam.time_left": "Zbývá",
+    "exam.time_up": "Čas vypršel — odevzdávám…",
+    "exam.time_limit_notice": "Test má časový limit {n} min od stisknutí tlačítka Start. Po uplynutí času se odpovědi odešlou automaticky.",
+    "Time limit in minutes (0 = no limit)": "Časový limit v minutách (0 = bez limitu)",
+    "A countdown is shown and the answers are submitted automatically at zero. The server also checks the time: a submission arriving more than a minute late is kept but flagged.": "Zobrazí se odpočet a při nule se odpovědi odešlou automaticky. Čas kontroluje i server: odevzdání o více než minutu po limitu se uloží, ale označí se.",
+    "No contact with the exam page for {time} (measured by the server)": "Žádné spojení se stránkou testu po dobu {time} (měřeno serverem)",
+    "Monitoring script never reported in (blocked or tampered with)": "Kontrolní skript se nikdy neozval (zablokován nebo upraven)",
+    "Submitted {time} after the time limit": "Odevzdáno {time} po časovém limitu"
 }

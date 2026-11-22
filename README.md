@@ -102,6 +102,17 @@ the `MathubExamGuard` registry in `exam.js`:
 - closing or reloading the page is reported immediately to the server
   (`sendBeacon`, server time); reopening logs how long the browser was gone
 
+- optional time limit (minutes, in the exam editor): a countdown from the
+  server's clock, automatic submit at zero; the server checks independently and
+  keeps-but-flags submissions more than a minute late (`late_submit`)
+- server-side evidence: the open page pings the server every 10 s. Silence over
+  45 s is logged as `heartbeat_lost` (server clock), and a submission whose
+  monitoring script never reported in is flagged `guard_missing`. Client events
+  cannot use these server-only types
+- submissions are updated under a file lock (`Exams::mutateSubmission`) with
+  atomic writes, so concurrent beacons, heartbeats, submit and marking cannot
+  overwrite each other
+
 Flagged events are shown in red on the submissions list and the submission
 page. Developer-tools detection is intentionally not implemented (there is no
 reliable browser API for it).

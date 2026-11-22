@@ -727,3 +727,6 @@ fieldset.settings legend { font-weight: 600; padding: 0 0.4rem; }
     .doc-header { flex-wrap: wrap; padding: 8px; }
     .doc-form .toastui-editor-ww-container .ProseMirror { padding: 32px 20px; min-height: 80vh; }
 }
+
+.exam-timer { position: fixed; top: 0.6rem; right: 0.6rem; z-index: 15000; padding: 0.35rem 0.8rem; border-radius: 999px; background: #111827; color: #fff; font-variant-numeric: tabular-nums; font-size: 0.95rem; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+.exam-timer-low { background: #b91c1c; }

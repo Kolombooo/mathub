@@ -24,6 +24,9 @@
         <?php if ($examSettings['monitor']): ?>
             <p class="notice"><?= View::e(I18n::t($lang, 'exam.monitor_notice')) ?></p>
         <?php endif; ?>
+        <?php if ($examSettings['timeLimitMin'] > 0): ?>
+            <p class="notice"><?= View::e(str_replace('{n}', (string)(int)$examSettings['timeLimitMin'], I18n::t($lang, 'exam.time_limit_notice'))) ?></p>
+        <?php endif; ?>
         <div class="flash flash-error" id="exam-start-error" hidden></div>
         <button type="submit"><?= View::e(I18n::t($lang, 'exam.start')) ?></button>
     </form>

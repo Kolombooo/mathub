@@ -76,5 +76,8 @@
     "builder.delete": "Delete",
     "builder.confirm_delete": "Delete this question?",
     "admin_js.copied": "Copied!",
-    "admin_js.upload_failed": "Upload failed"
+    "admin_js.upload_failed": "Upload failed",
+    "exam.time_left": "Time left",
+    "exam.time_up": "Time is up — submitting…",
+    "exam.time_limit_notice": "This exam has a time limit of {n} minutes, counted from when you press Start. Your answers are submitted automatically when time runs out."
 }
