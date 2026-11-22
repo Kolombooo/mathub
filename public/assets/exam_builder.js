@@ -9,9 +9,14 @@
     var form = document.getElementById('exam-form');
     var questions = data;
 
+    var i18nNode = document.getElementById('builder-i18n');
+    var I18N = i18nNode ? (JSON.parse(i18nNode.textContent) || {}) : {};
+    function t(key, fallback) { return I18N['builder.' + key] || fallback; }
+
     var LABELS = {
-        radio: 'Radio', checkbox: 'Checkbox', select: 'Select', short_text: 'Short text',
-        number: 'Number', long_text: 'Long text', match: 'Connect A to B', upload: 'Upload file', draw: 'Draw'
+        radio: t('type.radio', 'Radio'), checkbox: t('type.checkbox', 'Checkbox'), select: t('type.select', 'Select'),
+        short_text: t('type.short_text', 'Short text'), number: t('type.number', 'Number'), long_text: t('type.long_text', 'Long text'),
+        match: t('type.match', 'Connect A to B'), upload: t('type.upload', 'Upload file'), draw: t('type.draw', 'Draw')
     };
 
     function el(tag, attrs, children) {
@@ -63,7 +68,7 @@
     function optionsEditor(q) {
         var multi = q.type === 'checkbox';
         var wrap = el('div', { class: 'opts' });
-        var hint = multi ? 'Tick every correct option (optional).' : 'Tick the correct option; tick several to accept any of them (optional).';
+        var hint = multi ? t('hint_multi', 'Tick every correct option (optional).') : t('hint_single', 'Tick the correct option; tick several to accept any of them (optional).');
         wrap.appendChild(el('p', { class: 'muted', text: hint }));
         q.options.forEach(function (o, idx) {
             var cb = el('input', { type: 'checkbox' });
@@ -71,36 +76,36 @@
             cb.addEventListener('change', function () { o.correct = cb.checked; });
             wrap.appendChild(el('div', { class: 'opt-row' }, [
                 cb,
-                textInput(o.text, 'Option ' + (idx + 1), function (v) { o.text = v; }),
+                textInput(o.text, t('option', 'Option') + ' ' + (idx + 1), function (v) { o.text = v; }),
                 btn('✕', function () { q.options.splice(idx, 1); render(); }, 'button-secondary small')
             ]));
         });
-        wrap.appendChild(btn('+ Option', function () { q.options.push({ text: '', correct: false }); render(); }));
+        wrap.appendChild(btn(t('add_option', '+ Option'), function () { q.options.push({ text: '', correct: false }); render(); }));
         return wrap;
     }
 
     function acceptedEditor(q) {
         var wrap = el('div', { class: 'opts' });
-        wrap.appendChild(el('p', { class: 'muted', text: 'Accepted correct answers (optional, any of them counts' + (q.type === 'short_text' ? '; case and extra spaces are ignored' : '') + ').' }));
+        wrap.appendChild(el('p', { class: 'muted', text: q.type === 'short_text' ? t('accepted_hint_text', 'Accepted correct answers (optional, any of them counts; case and extra spaces are ignored).') : t('accepted_hint', 'Accepted correct answers (optional, any of them counts).') }));
         q.accepted.forEach(function (a, idx) {
             wrap.appendChild(el('div', { class: 'opt-row' }, [
-                textInput(a, 'Accepted answer', function (v) { q.accepted[idx] = v; }),
+                textInput(a, t('accepted_answer', 'Accepted answer'), function (v) { q.accepted[idx] = v; }),
                 btn('✕', function () { q.accepted.splice(idx, 1); render(); }, 'button-secondary small')
             ]));
         });
-        wrap.appendChild(btn('+ Accepted answer', function () { q.accepted.push(''); render(); }));
+        wrap.appendChild(btn(t('add_accepted', '+ Accepted answer'), function () { q.accepted.push(''); render(); }));
         if (q.type === 'number') {
             var tol = el('input', { type: 'number', step: 'any', min: '0' });
             tol.value = q.tolerance || 0;
             tol.addEventListener('input', function () { q.tolerance = parseFloat(tol.value) || 0; });
-            wrap.appendChild(el('label', { class: 'inline-label' }, [document.createTextNode('Tolerance ±'), tol]));
+            wrap.appendChild(el('label', { class: 'inline-label' }, [document.createTextNode(t('tolerance', 'Tolerance') + ' ±'), tol]));
         }
         return wrap;
     }
 
     function pairsEditor(q) {
         var wrap = el('div', { class: 'opts' });
-        wrap.appendChild(el('p', { class: 'muted', text: 'Enter the correct pairs. Students see both columns shuffled (differently for each student).' }));
+        wrap.appendChild(el('p', { class: 'muted', text: t('pairs_hint', 'Enter the correct pairs. Students see both columns shuffled (differently for each student).') }));
         q.pairs.forEach(function (p, idx) {
             wrap.appendChild(el('div', { class: 'opt-row' }, [
                 textInput(p.left, 'A', function (v) { p.left = v; }),
@@ -109,14 +114,14 @@
                 btn('✕', function () { q.pairs.splice(idx, 1); render(); }, 'button-secondary small')
             ]));
         });
-        wrap.appendChild(btn('+ Pair', function () { q.pairs.push({ left: '', right: '' }); render(); }));
+        wrap.appendChild(btn(t('add_pair', '+ Pair'), function () { q.pairs.push({ left: '', right: '' }); render(); }));
         return wrap;
     }
 
     function render() {
         container.innerHTML = '';
         questions.forEach(function (q, i) {
-            var text = el('textarea', { rows: '2', placeholder: 'Question text' });
+            var text = el('textarea', { rows: '2', placeholder: t('question_text', 'Question text') });
             text.value = q.text || '';
             text.addEventListener('input', function () { q.text = text.value; });
 
@@ -128,17 +133,17 @@
             if (q.options) { body = optionsEditor(q); }
             else if (q.accepted) { body = acceptedEditor(q); }
             else if (q.pairs) { body = pairsEditor(q); }
-            else { body = el('p', { class: 'muted', text: 'Scored by hand.' }); }
+            else { body = el('p', { class: 'muted', text: t('manual', 'Scored by hand.') }); }
 
             container.appendChild(el('div', { class: 'qcard' }, [
                 el('div', { class: 'qcard-head' }, [
                     el('strong', { text: (i + 1) + '. ' + LABELS[q.type] }),
                     el('span', { class: 'spacer' }),
-                    el('label', { class: 'inline-label' }, [document.createTextNode('Points'), pts]),
+                    el('label', { class: 'inline-label' }, [document.createTextNode(t('points', 'Points')), pts]),
                     btn('↑', function () { move(i, -1); }, 'button-secondary small'),
                     btn('↓', function () { move(i, 1); }, 'button-secondary small'),
-                    btn('Delete', function () {
-                        if (confirm('Delete this question?')) { questions.splice(i, 1); render(); }
+                    btn(t('delete', 'Delete'), function () {
+                        if (confirm(t('confirm_delete', 'Delete this question?'))) { questions.splice(i, 1); render(); }
                     }, 'danger small')
                 ]),
                 text,

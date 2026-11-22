@@ -12,9 +12,26 @@ final class I18n
         return dirname(__DIR__) . '/lang';
     }
 
+    /** Language used for the teacher UI and as default for new classes/topics (env MATHUB_LANG, default Czech). */
     public static function defaultLang(): string
     {
-        return self::DEFAULT_LANG;
+        $lang = getenv('MATHUB_LANG') ?: 'cs';
+        return self::isAvailable($lang) ? basename($lang) : self::DEFAULT_LANG;
+    }
+
+    /**
+     * Translate an interface string whose key is its English text.
+     * Placeholders like {n} are replaced from $params. Falls back to the English text.
+     *
+     * @param array<string, string|int|float> $params
+     */
+    public static function ui(string $text, array $params = []): string
+    {
+        $out = self::t(self::defaultLang(), $text);
+        foreach ($params as $k => $v) {
+            $out = str_replace('{' . $k . '}', (string)$v, $out);
+        }
+        return $out;
     }
 
     /** @return list<array{code: string, name: string}> */

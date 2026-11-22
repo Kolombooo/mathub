@@ -1,7 +1,7 @@
 <div class="page-header">
     <div>
-        <h1>Account</h1>
-        <p class="page-sub">Change your teacher password.</p>
+        <h1><?= View::tr('Account') ?></h1>
+        <p class="page-sub"><?= View::tr('Change your teacher password.') ?></p>
     </div>
 </div>
 <?php if (!empty($error)): ?>
@@ -9,11 +9,11 @@
 <?php endif; ?>
 <form method="post" action="/admin/account/password" class="panel" style="max-width:420px">
     <?= Csrf::field() ?>
-    <label>Current password
+    <label><?= View::tr('Current password') ?>
         <input type="password" name="current_password" required>
     </label>
-    <label>New password
+    <label><?= View::tr('New password') ?>
         <input type="password" name="new_password" required minlength="8">
     </label>
-    <button type="submit">Change password</button>
+    <button type="submit"><?= View::tr('Change password') ?></button>
 </form>

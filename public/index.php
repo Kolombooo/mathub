@@ -32,7 +32,7 @@ function requireCsrf(): void
 {
     if (!Csrf::verify($_POST['csrf_token'] ?? null)) {
         http_response_code(400);
-        echo 'Invalid CSRF token.';
+        echo I18n::ui('Invalid CSRF token.');
         exit;
     }
 }
@@ -40,7 +40,7 @@ function requireCsrf(): void
 function notFound(): void
 {
     http_response_code(404);
-    View::render('404', ['title' => 'Not found']);
+    View::render('404', ['title' => I18n::ui('Not found')]);
     exit;
 }
 
@@ -152,7 +152,7 @@ if ($path === '/admin/login') {
         if (Auth::isLoggedIn()) {
             redirect('/admin');
         }
-        View::render('admin/login', ['title' => 'Teacher login']);
+        View::render('admin/login', ['title' => I18n::ui('Teacher login')]);
         exit;
     }
     if ($method === 'POST') {
@@ -160,7 +160,7 @@ if ($path === '/admin/login') {
         if (Auth::attempt((string)($_POST['username'] ?? ''), (string)($_POST['password'] ?? ''))) {
             redirect('/admin');
         }
-        View::render('admin/login', ['title' => 'Teacher login', 'error' => 'Invalid username or password.']);
+        View::render('admin/login', ['title' => I18n::ui('Teacher login'), 'error' => I18n::ui('Invalid username or password.')]);
         exit;
     }
 }
@@ -178,7 +178,7 @@ if ($decoded !== [] && $decoded[0] === 'admin' && $path !== '/admin/login') {
 
 if ($path === '/admin/account') {
     if ($method === 'GET') {
-        View::render('admin/account', ['title' => 'Account']);
+        View::render('admin/account', ['title' => I18n::ui('Account')]);
         exit;
     }
 }
@@ -188,14 +188,14 @@ if ($path === '/admin/account/password' && $method === 'POST') {
     $current = (string)($_POST['current_password'] ?? '');
     $new = (string)($_POST['new_password'] ?? '');
     if (strlen($new) < 8) {
-        View::render('admin/account', ['title' => 'Account', 'error' => 'New password must be at least 8 characters.']);
+        View::render('admin/account', ['title' => I18n::ui('Account'), 'error' => I18n::ui('New password must be at least 8 characters.')]);
         exit;
     }
     if (!Auth::changePassword($current, $new)) {
-        View::render('admin/account', ['title' => 'Account', 'error' => 'Current password is incorrect.']);
+        View::render('admin/account', ['title' => I18n::ui('Account'), 'error' => I18n::ui('Current password is incorrect.')]);
         exit;
     }
-    flash('success', 'Password changed.');
+    flash('success', I18n::ui('Password changed.'));
     redirect('/admin/account');
 }
 
@@ -204,7 +204,7 @@ if ($path === '/admin/account/password' && $method === 'POST') {
 // ---------------------------------------------------------------------
 
 if ($path === '/admin' && $method === 'GET') {
-    View::render('admin/dashboard', ['title' => 'Admin', 'classes' => Storage::listClasses()]);
+    View::render('admin/dashboard', ['title' => I18n::ui('Admin'), 'classes' => Storage::listClasses()]);
     exit;
 }
 
@@ -212,7 +212,7 @@ if ($path === '/admin/classes' && $method === 'POST') {
     requireCsrf();
     try {
         Storage::createClass((string)($_POST['title'] ?? ''));
-        flash('success', 'Class created.');
+        flash('success', I18n::ui('Class created.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -239,7 +239,7 @@ if (count($decoded) === 4 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     $classSlug = $decoded[2];
     try {
         Storage::renameClass($classSlug, (string)($_POST['title'] ?? ''));
-        flash('success', 'Class renamed.');
+        flash('success', I18n::ui('Class renamed.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -249,7 +249,7 @@ if (count($decoded) === 4 && $decoded[0] === 'admin' && $decoded[1] === 'classes
 if (count($decoded) === 4 && $decoded[0] === 'admin' && $decoded[1] === 'classes' && $decoded[3] === 'delete' && $method === 'POST') {
     requireCsrf();
     Storage::deleteClass($decoded[2]);
-    flash('success', 'Class deleted.');
+    flash('success', I18n::ui('Class deleted.'));
     redirect('/admin');
 }
 
@@ -262,7 +262,7 @@ if (count($decoded) === 4 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     $classSlug = $decoded[2];
     try {
         Storage::createTopic($classSlug, (string)($_POST['title'] ?? ''));
-        flash('success', 'Topic created.');
+        flash('success', I18n::ui('Topic created.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -295,7 +295,7 @@ if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     [, , $classSlug, , $topicSlug] = $decoded;
     try {
         Storage::renameTopic($classSlug, $topicSlug, (string)($_POST['title'] ?? ''));
-        flash('success', 'Topic renamed.');
+        flash('success', I18n::ui('Topic renamed.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -307,7 +307,7 @@ if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     [, , $classSlug, , $topicSlug] = $decoded;
     try {
         Storage::setTopicLang($classSlug, $topicSlug, (string)($_POST['lang'] ?? ''));
-        flash('success', 'Language updated.');
+        flash('success', I18n::ui('Language updated.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -318,7 +318,7 @@ if (count($decoded) === 6 && $decoded[0] === 'admin' && $decoded[1] === 'classes
     requireCsrf();
     [, , $classSlug, , $topicSlug] = $decoded;
     Storage::deleteTopic($classSlug, $topicSlug);
-    flash('success', 'Topic deleted.');
+    flash('success', I18n::ui('Topic deleted.'));
     redirect('/admin/classes/' . rawurlencode($classSlug));
 }
 
@@ -334,7 +334,7 @@ if (count($decoded) === 7 && $decoded[5] === 'materials' && $decoded[6] === 'new
         notFound();
     }
     View::render('admin/material_edit', [
-        'title' => 'New material',
+        'title' => I18n::ui('New material'),
         'bodyClass' => 'page-doc-editor',
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
@@ -358,7 +358,7 @@ if (count($decoded) === 8 && $decoded[5] === 'materials' && $decoded[7] === 'edi
     $materialTitle = Storage::getMaterialTitle($classSlug, $topicSlug, $materialSlug);
     $body = preg_replace('/^#\s+.*\r?\n\r?\n?/', '', $content, 1);
     View::render('admin/material_edit', [
-        'title' => 'Edit material',
+        'title' => I18n::ui('Edit material'),
         'bodyClass' => 'page-doc-editor',
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
@@ -377,7 +377,7 @@ if (count($decoded) === 7 && $decoded[5] === 'materials' && $decoded[6] === 'sav
     $materialSlug = $_POST['material_slug'] ?? null;
     try {
         $slug = Storage::saveMaterial($classSlug, $topicSlug, $materialSlug ?: null, (string)($_POST['title'] ?? ''), (string)($_POST['body'] ?? ''));
-        flash('success', 'Material saved.');
+        flash('success', I18n::ui('Material saved.'));
         redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug) . '/materials/' . rawurlencode($slug) . '/edit');
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
@@ -389,7 +389,7 @@ if (count($decoded) === 8 && $decoded[5] === 'materials' && $decoded[7] === 'del
     requireCsrf();
     [, , $classSlug, , $topicSlug, , $materialSlug] = $decoded;
     Storage::deleteMaterial($classSlug, $topicSlug, $materialSlug);
-    flash('success', 'Material deleted.');
+    flash('success', I18n::ui('Material deleted.'));
     redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug));
 }
 
@@ -415,11 +415,11 @@ if (count($decoded) === 8 && $decoded[5] === 'materials' && $decoded[7] === 'mov
 
 if (count($decoded) === 6 && $decoded[5] === 'uploads' && $method === 'POST') {
     if (!Csrf::verify($_POST['csrf_token'] ?? null)) {
-        jsonResponse(['ok' => false, 'error' => 'Invalid CSRF token.'], 400);
+        jsonResponse(['ok' => false, 'error' => I18n::ui('Invalid CSRF token.')], 400);
     }
     [, , $classSlug, , $topicSlug] = $decoded;
     if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-        jsonResponse(['ok' => false, 'error' => 'No file uploaded.'], 400);
+        jsonResponse(['ok' => false, 'error' => I18n::ui('No file uploaded.')], 400);
     }
     try {
         $result = Storage::saveUpload($classSlug, $topicSlug, $_FILES['file']['tmp_name'], $_FILES['file']['name']);
@@ -433,7 +433,7 @@ if (count($decoded) === 8 && $decoded[5] === 'uploads' && $decoded[7] === 'delet
     requireCsrf();
     [, , $classSlug, , $topicSlug, , $filename] = $decoded;
     Storage::deleteUpload($classSlug, $topicSlug, $filename);
-    flash('success', 'File deleted.');
+    flash('success', I18n::ui('File deleted.'));
     redirect('/admin/classes/' . rawurlencode($classSlug) . '/topics/' . rawurlencode($topicSlug));
 }
 

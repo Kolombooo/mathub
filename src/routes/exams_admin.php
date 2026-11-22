@@ -15,7 +15,7 @@ if ($method === 'POST' && count($decoded) === 4 && $decoded[3] === 'language') {
     requireCsrf();
     try {
         Storage::setClassLang($classSlug, (string)($_POST['lang'] ?? ''));
-        flash('success', 'Language updated.');
+        flash('success', I18n::ui('Language updated.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -38,7 +38,7 @@ if (count($decoded) === 4 && $method === 'GET') {
         }
     }
     View::render('admin/exams', [
-        'title' => 'Exams',
+        'title' => I18n::ui('Exams'),
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'exams' => Exams::listExams($classSlug),
@@ -107,7 +107,7 @@ if (count($decoded) === 6 && $decoded[5] === 'save' && $method === 'POST') {
             (string)($_POST['content_id'] ?? ''),
             $code
         );
-        flash('success', 'Exam saved.');
+        flash('success', I18n::ui('Exam saved.'));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
     }
@@ -117,13 +117,13 @@ if (count($decoded) === 6 && $decoded[5] === 'save' && $method === 'POST') {
 if (count($decoded) === 6 && $decoded[5] === 'delete' && $method === 'POST') {
     requireCsrf();
     Exams::deleteExam($classSlug, $examId);
-    flash('success', 'Exam deleted.');
+    flash('success', I18n::ui('Exam deleted.'));
     redirect($base . '/exams');
 }
 
 if (count($decoded) === 6 && $decoded[5] === 'submissions' && $method === 'GET') {
     View::render('admin/submissions', [
-        'title' => $exam['title'] . ' · Submissions',
+        'title' => $exam['title'] . ' · ' . I18n::ui('Submissions'),
         'classSlug' => $classSlug,
         'classTitle' => $classTitle,
         'exam' => $exam,
@@ -177,14 +177,14 @@ if (count($decoded) >= 7 && $decoded[5] === 'submissions') {
             }
         }
         Exams::saveSubmission($classSlug, $examId, $sub);
-        flash('success', $action === 'mark' ? 'Saved and marked.' : 'Saved.');
+        flash('success', $action === 'mark' ? I18n::ui('Saved and marked.') : I18n::ui('Saved.'));
         redirect($action === 'mark' ? $examBase . '/submissions' : $subBase);
     }
 
     if (count($decoded) === 8 && $decoded[7] === 'delete' && $method === 'POST') {
         requireCsrf();
         Exams::deleteSubmission($classSlug, $examId, $sid);
-        flash('success', 'Submission deleted.');
+        flash('success', I18n::ui('Submission deleted.'));
         redirect($examBase . '/submissions');
     }
 

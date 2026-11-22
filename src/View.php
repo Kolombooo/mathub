@@ -33,6 +33,18 @@ final class View
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }
 
+    /** Translated string as a JS string literal, safe inside an HTML attribute (e.g. onsubmit="return confirm(...)"). */
+    public static function jsq(string $text, array $params = []): string
+    {
+        return self::e(json_encode(I18n::ui($text, $params), JSON_UNESCAPED_UNICODE));
+    }
+
+    /** Translated (UI language) and HTML-escaped interface string. */
+    public static function tr(string $text, array $params = []): string
+    {
+        return self::e(I18n::ui($text, $params));
+    }
+
     /**
      * Appends a cache-busting ?v=<mtime> to a /assets/... URL, so browsers
      * fetch a fresh copy whenever the file actually changes instead of
