@@ -8,11 +8,9 @@ unset($_SESSION['flash']);
 <html lang="<?= View::e($lang ?? I18n::defaultLang()) ?>">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= isset($title) ? View::e($title) . ' · MatHub' : 'MatHub' ?></title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500&amp;family=Hanken+Grotesk:wght@300;400;500;600;700&amp;display=swap">
+<link rel="preload" href="/assets/fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="<?= View::e(View::asset('/assets/style.css')) ?>">
 </head>
 <?php if ($isAdminShell): $nav = AdminNav::build($requestPath); ?>

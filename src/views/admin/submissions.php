@@ -55,7 +55,7 @@ foreach ($submissions as $s) {
                 <td><?= round(Exams::totalScore($s), 2) ?> / <?= round($maxScore, 2) ?></td>
                 <?php $fl = Exams::flagSummary($s); ?>
                 <td><?php if ($fl['count']): ?><span class="flag" title="<?= View::tr('Left the page for {n}s in total', ['n' => $fl['awaySec']]) ?>"><?= $fl['count'] ?> &#9873;<?= $fl['awaySec'] ? ' · ' . sprintf('%d:%02d', intdiv($fl['awaySec'], 60), $fl['awaySec'] % 60) . ' ' . I18n::ui('away') : '' ?></span><?php else: ?><span class="muted">–</span><?php endif; ?></td>
-                <td><span class="badge <?= $s['status'] === 'marked' ? 'badge-ok' : '' ?>"><?= $s['status'] === 'marked' ? View::tr('Marked') : View::tr('To mark') ?></span></td>
+                <td><span class="badge <?= $s['status'] === 'marked' ? 'badge-ok' : 'badge-warn' ?>"><?= $s['status'] === 'marked' ? View::tr('Marked') : View::tr('To mark') ?></span></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

@@ -30,7 +30,7 @@ $pairById = function (array $q, string $id): ?array {
     <a href="<?= $examBase ?>/submissions"><?= View::e($exam['title']) ?></a>
 </p>
 <h1><?= View::e($sub['firstName'] . ' ' . $sub['lastName']) ?>
-    <span class="badge <?= $sub['status'] === 'marked' ? 'badge-ok' : '' ?>"><?= View::tr(['working' => 'Still working', 'submitted' => 'To mark', 'marked' => 'Marked'][$sub['status']]) ?></span>
+    <span class="badge <?= ['working' => 'badge-blue', 'submitted' => 'badge-warn', 'marked' => 'badge-ok'][$sub['status']] ?? '' ?>"><?= View::tr(['working' => 'Still working', 'submitted' => 'To mark', 'marked' => 'Marked'][$sub['status']]) ?></span>
 </h1>
 <p class="muted">
     <?= View::tr('Started') ?> <?= date('Y-m-d H:i:s', $sub['startedAt']) ?>
