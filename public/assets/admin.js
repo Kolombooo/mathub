@@ -16,11 +16,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // WYSIWYG markdown editor (Toast UI) on the material edit page
     var editorHost = document.getElementById('editor');
-    if (!editorHost || typeof toastui === 'undefined') {
+    if (!editorHost) {
         return;
     }
 
     var bodyField = document.getElementById('material-body');
+    var form = document.getElementById('material-form');
+    var titleField = document.getElementById('material-title');
 
     function uploadFile(file) {
         var formData = new FormData();
@@ -30,12 +32,70 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (res) { return res.json(); });
     }
 
+    // Unsaved-changes guard and Ctrl/Cmd+S, shared by the visual and plain editors.
+    var dirty = false;
+    var saving = false;
+    var initialTitle = titleField ? titleField.value : '';
+    var initialBody = null;
+    function markDirty() { dirty = true; }
+    function currentBody() { return editor ? editor.getMarkdown() : bodyField.value; }
+    function refreshDirty() {
+        dirty = (titleField && titleField.value !== initialTitle) || (initialBody !== null && currentBody() !== initialBody);
+    }
+    if (titleField) { titleField.addEventListener('input', refreshDirty); }
+    window.addEventListener('beforeunload', function (e) {
+        if (dirty && !saving) { e.preventDefault(); e.returnValue = ''; }
+    });
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
+        }
+    });
+    var editor = null;
+
+    // The visual editor comes from a CDN. If that is blocked (school networks,
+    // offline), fall back to the plain Markdown textarea instead of a blank page.
+    if (typeof toastui === 'undefined') {
+        bodyField.hidden = false;
+        bodyField.classList.add('is-fallback');
+        editorHost.hidden = true;
+        var note = document.getElementById('editor-fallback-note');
+        if (note) { note.hidden = false; }
+        initialBody = bodyField.value;
+        bodyField.addEventListener('input', refreshDirty);
+
+        var plainInput = document.createElement('input');
+        plainInput.type = 'file';
+        plainInput.style.display = 'none';
+        document.body.appendChild(plainInput);
+        plainInput.addEventListener('change', function () {
+            var file = plainInput.files[0];
+            if (!file) return;
+            uploadFile(file).then(function (data) {
+                if (!data.ok) { alert(data.error || t('upload_failed', 'Upload failed')); return; }
+                var isImage = /^image\//.test(file.type);
+                var md = (isImage ? '!' : '') + '[' + (file.name || 'file') + '](' + data.url + ')';
+                var s = bodyField.selectionStart, e2 = bodyField.selectionEnd;
+                bodyField.value = bodyField.value.slice(0, s) + md + bodyField.value.slice(e2);
+                bodyField.selectionStart = bodyField.selectionEnd = s + md.length;
+                bodyField.focus();
+                refreshDirty();
+            }).catch(function () { alert(t('upload_failed', 'Upload failed')); });
+            plainInput.value = '';
+        });
+        var plainAttach = document.getElementById('attach-file-btn');
+        if (plainAttach) { plainAttach.addEventListener('click', function () { plainInput.click(); }); }
+        form.addEventListener('submit', function () { saving = true; });
+        return;
+    }
+
     // Sized images are written as ![alt](url){width="300px"} (a CommonMark
     // attributes suffix the server-side renderer understands and applies to
     // the <img> tag). Toast UI's own markdown parser doesn't know that
     // syntax, so the marker shows up as plain trailing text next to the
     // image while editing; it never reaches the public page.
-    var editor = new toastui.Editor({
+    editor = new toastui.Editor({
         el: editorHost,
         language: window.MATHUB_EDITOR_LANG || 'en-US',
         height: '100%',
@@ -56,6 +116,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     });
+
+    initialBody = editor.getMarkdown();
+    editor.on('change', refreshDirty);
 
     setupImageResize(editor, editorHost);
 
@@ -162,8 +225,8 @@ document.addEventListener('DOMContentLoaded', function () {
         attachBtn.addEventListener('click', function () { fileInput.click(); });
     }
 
-    var form = document.getElementById('material-form');
     form.addEventListener('submit', function () {
+        saving = true;
         bodyField.value = editor.getMarkdown();
     });
 });

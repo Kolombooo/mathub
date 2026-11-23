@@ -5,17 +5,20 @@
         <input type="hidden" name="material_slug" value="<?= View::e($materialSlug) ?>">
     <?php endif; ?>
     <header class="doc-header">
-        <a class="doc-back" href="<?= $topicUrl ?>" title="<?= View::tr('Back to {name}', ['name' => $topicTitle]) ?>" aria-label="<?= View::tr('Back') ?>">&#8592;</a>
+        <a class="doc-back" href="<?= $topicUrl ?>" title="<?= View::tr('Back to {name}', ['name' => $topicTitle]) ?>" aria-label="<?= View::tr('Back') ?>"><?= AdminNav::icon('arrow_back') ?></a>
         <div class="doc-heading">
             <input type="text" name="title" id="material-title" class="doc-title" value="<?= View::e($materialTitle) ?>" placeholder="<?= View::tr('Untitled material') ?>" aria-label="<?= View::tr('Title') ?>" required>
             <div class="doc-crumbs"><?= View::e($classTitle) ?> &rsaquo; <?= View::e($topicTitle) ?></div>
         </div>
-        <button type="button" id="attach-file-btn" class="button-secondary"><?= View::tr('📎 Attach file') ?></button>
-        <a href="<?= $topicUrl ?>" class="button-secondary"><?= View::tr('Cancel') ?></a>
-        <button type="submit" class="doc-save"><?= View::tr('Save') ?></button>
+        <div class="doc-actions">
+            <button type="button" id="attach-file-btn" class="button-secondary"><?= AdminNav::icon('attach_file') ?><span><?= View::tr('Attach file') ?></span></button>
+            <a href="<?= $topicUrl ?>" class="button-secondary"><?= View::tr('Cancel') ?></a>
+            <button type="submit" class="doc-save"><?= View::tr('Save') ?></button>
+        </div>
     </header>
+    <p id="editor-fallback-note" class="doc-notice" role="status" hidden><?= View::tr('The visual editor could not be loaded, so you are editing the Markdown text directly. Saving works as usual.') ?></p>
     <div id="editor"></div>
-    <textarea name="body" id="material-body" hidden><?= View::e($body) ?></textarea>
+    <textarea name="body" id="material-body" class="doc-fallback-text" aria-label="<?= View::tr('Material text (Markdown)') ?>" hidden><?= View::e($body) ?></textarea>
 </form>
 
 <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">

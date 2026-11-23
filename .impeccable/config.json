@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "sfmono-regular",
+        "createdAt": "2026-11-23T10:29:41.798Z",
+        "reason": "Claude: monospace for raw Markdown source in the editor fallback textarea; documented in DESIGN.md Typography"
+      }
+    ]
+  }
+}

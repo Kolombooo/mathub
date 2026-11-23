@@ -157,7 +157,7 @@ A restrained palette: one muted blue, cool neutrals, and three status hues used 
 
 **Display Font:** Hanken Grotesk, self-hosted as a variable font (`public/assets/fonts`, latin and latin-ext subsets), with system sans-serif fallback
 **Body Font:** Hanken Grotesk (same family)
-**Label/Mono Font:** none distinct; labels are Hanken Grotesk at 14px semibold.
+**Label/Mono Font:** labels are Hanken Grotesk at 14px semibold. The only monospace use is the plain Markdown text box shown when the material editor's visual mode can't load (system stack: ui-monospace, SFMono-Regular, Menlo, Consolas), because it holds raw source.
 
 **Character:** A single clear, slightly humanist grotesk. Hierarchy comes from weight (300 to 700) and size, not from pairing. No third-party font requests are made.
 
