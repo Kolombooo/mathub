@@ -105,7 +105,9 @@ automatic tests).
   cross-origin isolated, so code exam pages are sent with `Cross-Origin-Opener-Policy:
   same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (the
   sandboxed runner page, `src/runner/code_runner.html`, is served by PHP at
-  `/exams/code-runner` with the matching header).
+  `/exams/code-runner` with the matching headers). If a browser cannot start the runner in this mode, the
+  page switches itself to the input-box fallback (cookie `mathub_nolive`) and reloads;
+  set `MATHUB_LIVE_INPUT=0` to turn live input off for everyone.
   Consequence: images in assignment text must be uploaded to the site, not linked
   from other domains. Without isolation the console falls back to a pre-filled input
   box.

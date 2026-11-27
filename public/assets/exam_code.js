@@ -62,6 +62,13 @@
             var thisFrame = frame;
             setTimeout(function () {
                 if (frame !== thisFrame || frameReady) { return; }
+                // Some browsers refuse the isolated setup. Switch this browser to the non-isolated mode
+                // (input box instead of live input) once and reload; work is restored from the draft.
+                if (window.crossOriginIsolated && !/(^|; )mathub_nolive=/.test(document.cookie)) {
+                    document.cookie = 'mathub_nolive=1; path=/exams; max-age=31536000; SameSite=Lax';
+                    location.reload();
+                    return;
+                }
                 var waiting = queue.filter(function (m) { return m.t === 'run'; });
                 queue = [];
                 thisFrame.remove();
