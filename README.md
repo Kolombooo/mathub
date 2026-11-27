@@ -81,6 +81,47 @@ end. Exam data lives in `data/exams/<class>/<exam>/` (`exam.json`, `submissions/
 `files/`) and exam content in `data/exam_contents/<id>.json` (not in `content/`,
 so they are not mistaken for topics).
 
+### Code exams
+
+An exam content has a **type**, chosen when it is created: *Written* (the
+question types above), *Upload* (file upload questions only) or *Code*.
+
+A *Code* content is a list of **assignments**. Each has a title, a description
+in Markdown, a language (Python or JavaScript), optional starting code and
+points. Students see a sidebar with the assignments; the selected one has two
+tabs, **Zadání** (the description) and **Kód** (a single-file editor with syntax
+highlighting, auto-indent and bracket closing, plus Run, an input box and an
+output panel). Submitted code is shown to the teacher and scored by hand (no
+automatic tests).
+
+- **Running code happens in the student's browser**, in a sandboxed iframe
+  (`public/assets/code_runner.html`) with one Web Worker per run; the server never
+  executes student code. Infinite loops are killed (JS 10 s, Python 30 s) and the
+  output is capped. Memory cannot be limited from a browser.
+- **JavaScript**: `import` of CDN URLs works; bare names (`import _ from 'lodash'`)
+  are loaded from esm.sh. `prompt()` reads the input box.
+- **Python** runs on [Pyodide](https://pyodide.org) (WebAssembly), loaded from the
+  jsDelivr CDN on first use (~10 MB, then cached). Libraries shipped with Pyodide
+  (numpy, pandas, matplotlib, scipy, sympy, …) load automatically on `import`;
+  other pure-Python packages are installed from PyPI with micropip. `input()` reads
+  the input box; matplotlib figures are shown under the output. Students therefore
+  need internet access to `cdn.jsdelivr.net`, `pypi.org` / `files.pythonhosted.org`
+  and `esm.sh`. To self-host Pyodide set `MATHUB_PYODIDE_URL` to its base URL
+  (ending in `/`).
+- **C#** is not supported yet.
+- **Autosave**: code is saved to the server a few seconds after a change
+  (`data/exams/<class>/<exam>/drafts/<submission>.json`, one file per student, no
+  shared locks) and to the browser. A student who reloads or reopens the exam gets
+  the newest copy back; the teacher sees the draft of a student who is still
+  working. The final submit is unchanged.
+- **Chatbot (prepared, not implemented)**: every assignment stores a `chat` flag
+  (disabled switch in the builder), the Code tab has an empty hidden
+  `[data-chat-slot]`, submissions reserve `chats` for transcripts, and a future
+  module can plug in through `MathubExamCode.chat = { mount(question, container, api) }`.
+
+The editor is a vendored CodeMirror 6 build (`public/assets/vendor/codeeditor.min.js`,
+rebuild instructions in `tools/codeeditor/README.md`).
+
 **Upgrading from the per-class-code layout:** on first request the app runs a
 non-destructive migration (marker file `data/.exam_architecture_v2`). Each
 existing exam gets an exam content made from its questions (question ids

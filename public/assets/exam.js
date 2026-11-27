@@ -108,6 +108,8 @@
         answers: {},   // qid -> string | string[] | {leftId: rightId}
         files: {},     // qid -> { blob, name }
         drawData: {},  // qid -> SignaturePad point groups (to re-open a drawing)
+        codeAt: {},    // qid -> ms timestamp of the last edit of a code answer (newer-wins on resume)
+        resumeDirty: [], // code answers where this browser is newer than the server's autosave
         submitting: false,
         done: false,
         deadline: null,    // local-clock ms when the time limit ends (null = no limit)
@@ -130,7 +132,7 @@
         if (!state.sid || state.done) { return; }
         try {
             localStorage.setItem(storageKey, JSON.stringify({
-                sid: state.sid, answers: state.answers, events: Guard.events, lastSeen: Date.now()
+                sid: state.sid, answers: state.answers, codeAt: state.codeAt, events: Guard.events, lastSeen: Date.now()
             }));
         } catch (e) { /* storage full/blocked: fine */ }
     }
@@ -214,6 +216,7 @@
     function isAnswered(q) {
         if (q.type === 'upload' || q.type === 'draw') { return !!state.files[q.id]; }
         var a = state.answers[q.id];
+        if (q.type === 'code') { return typeof a === 'string' && a.trim() !== '' && a !== (q.starter || ''); }
         if (q.type === 'checkbox') { return Array.isArray(a) && a.length > 0; }
         if (q.type === 'match') {
             return !!a && q.lefts.every(function (l) { return a[l.id]; });
@@ -639,6 +642,36 @@
     // ------------------------------------------------------------------
     function renderExam() {
         main.innerHTML = '';
+        var errorBox = el('div', { class: 'flash flash-error', hidden: 'hidden', id: 'exam-submit-error' });
+        var submit = el('button', { type: 'button', class: 'exam-submit', text: t('submit') });
+        submit.addEventListener('click', function () { submitExam(submit, errorBox); });
+
+        var root;
+        if (state.exam.kind === 'code' && window.MathubExamCode) {
+            // Code exams: sidebar of assignments + editor (exam_code.js). It also places the submit button.
+            root = window.MathubExamCode.render({
+                state: state, app: app, el: el, t: t, setAnswer: setAnswer, fmtPoints: fmtPoints, showDialog: showDialog,
+                submitButton: submit, errorBox: errorBox
+            });
+            main.appendChild(root);
+        } else {
+            root = renderQuestionList();
+            main.appendChild(root);
+            main.appendChild(errorBox);
+            main.appendChild(el('div', { class: 'form-actions' }, [submit]));
+        }
+        state.autoSubmit = function () { doSubmit(submit, errorBox); };
+        setupTimer();
+
+        startForm.hidden = true;
+        main.hidden = false;
+        window.scrollTo(0, 0);
+        Guard.init({ root: root, exam: state.exam, resumed: !!resumeInfo, lastSeen: resumeInfo ? resumeInfo.lastSeen : null });
+        resumeInfo = null;
+        window.dispatchEvent(new Event('mathub-exam-rendered'));
+    }
+
+    function renderQuestionList() {
         var root = el('div', { class: 'exam-questions' });
         state.exam.questions.forEach(function (q, i) {
             var head = el('div', { class: 'q-head' }, [
@@ -652,22 +685,7 @@
             ]);
             root.appendChild(section);
         });
-        main.appendChild(root);
-
-        var errorBox = el('div', { class: 'flash flash-error', hidden: 'hidden', id: 'exam-submit-error' });
-        var submit = el('button', { type: 'button', class: 'exam-submit', text: t('submit') });
-        submit.addEventListener('click', function () { submitExam(submit, errorBox); });
-        main.appendChild(errorBox);
-        main.appendChild(el('div', { class: 'form-actions' }, [submit]));
-        state.autoSubmit = function () { doSubmit(submit, errorBox); };
-        setupTimer();
-
-        startForm.hidden = true;
-        main.hidden = false;
-        window.scrollTo(0, 0);
-        Guard.init({ root: root, exam: state.exam, resumed: !!resumeInfo, lastSeen: resumeInfo ? resumeInfo.lastSeen : null });
-        resumeInfo = null;
-        window.dispatchEvent(new Event('mathub-exam-rendered'));
+        return root;
     }
 
     // ------------------------------------------------------------------
@@ -688,7 +706,22 @@
         state.deadline = limitMin > 0 && data.startedAt && data.serverTime
             ? Date.now() + ((data.startedAt + limitMin * 60) - data.serverTime) * 1000
             : null;
-        if (!resumed) { state.answers = {}; }
+        if (!resumed) { state.answers = {}; state.codeAt = {}; }
+        // Code autosaved on the server wins where it is newer than this browser's copy; where this
+        // browser is newer, the code is sent up again once the editor is on screen.
+        state.resumeDirty = [];
+        var drafts = data.drafts || {};
+        (data.exam.questions || []).forEach(function (q) {
+            if (q.type !== 'code') { return; }
+            var server = drafts[q.id];
+            var localAt = state.codeAt[q.id] || 0;
+            if (server && typeof server.code === 'string' && server.at * 1000 > localAt) {
+                state.answers[q.id] = server.code;
+                state.codeAt[q.id] = server.at * 1000;
+            } else if (typeof state.answers[q.id] === 'string' && localAt > ((server && server.at) || 0) * 1000) {
+                state.resumeDirty.push(q.id);
+            }
+        });
         renderExam();
         saveDraft();
         if (resumed) {
@@ -696,11 +729,11 @@
         }
     }
 
-    function start(fd, resumedAnswers) {
+    function start(fd, resumedAnswers, resumedCodeAt) {
         fd.append('csrf_token', app.dataset.csrf);
         return postForm(app.dataset.startUrl, fd).then(function (data) {
             if (!data.ok) { throw new Error(data.error || 'start'); }
-            if (resumedAnswers) { state.answers = resumedAnswers; }
+            if (resumedAnswers) { state.answers = resumedAnswers; state.codeAt = resumedCodeAt || {}; }
             begin(data, !!resumedAnswers);
         });
     }
@@ -722,7 +755,7 @@
         if (Array.isArray(draft.events)) { Guard.events = draft.events; }
         var fd = new FormData();
         fd.append('resume', draft.sid);
-        start(fd, draft.answers || {}).catch(function () { clearDraft(); resumeInfo = null; Guard.events = []; });
+        start(fd, draft.answers || {}, draft.codeAt || {}).catch(function () { clearDraft(); resumeInfo = null; Guard.events = []; });
     }
 
     // ------------------------------------------------------------------
@@ -756,6 +789,7 @@
             state.done = true;
             Guard.active = false;
             Guard.call('onFinish');
+            window.dispatchEvent(new Event('mathub-exam-done'));
             clearDraft();
             main.innerHTML = '';
             main.appendChild(el('div', { class: 'exam-done' }, [

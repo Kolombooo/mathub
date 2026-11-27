@@ -43,6 +43,20 @@ $pairById = function (array $q, string $id): ?array {
 
 <?php if ($working): ?>
     <p class="empty"><?= View::tr('The student has not submitted yet; answers appear here once they do. The activity log below updates when you reload.') ?></p>
+    <?php foreach ($exam['questions'] as $i => $q): if ($q['type'] !== 'code') { continue; } $d = $liveDraft['answers'][$q['id']] ?? null; ?>
+        <section class="q review">
+            <div class="q-head">
+                <span class="q-num"><?= $i + 1 ?>.</span>
+                <span class="q-text"><?= View::e($q['text']) ?></span>
+                <span class="q-points"><?= View::tr('autosaved draft') ?><?= $d ? ' · ' . date('H:i:s', (int)$d['at']) : '' ?></span>
+            </div>
+            <?php if ($d && trim((string)$d['code']) !== ''): ?>
+                <pre class="code-answer" data-lang="<?= View::e($q['language'] ?? '') ?>"><?= View::e((string)$d['code']) ?></pre>
+            <?php else: ?>
+                <em class="muted"><?= View::tr('(no answer)') ?></em>
+            <?php endif; ?>
+        </section>
+    <?php endforeach; ?>
 <?php else: ?>
 <form method="post" action="<?= $subBase ?>/save">
     <?= Csrf::field() ?>
@@ -86,6 +100,10 @@ $pairById = function (array $q, string $id): ?array {
                             <?php endif;
                         endif;
                         break;
+                    case 'code': ?>
+                        <?php if (trim((string)$a) === ''): ?><em class="muted"><?= View::tr('(no answer)') ?></em>
+                        <?php else: ?><pre class="code-answer" data-lang="<?= View::e($q['language'] ?? '') ?>"><?= View::e((string)$a) ?></pre><?php endif; ?>
+                        <?php break;
                     default: ?>
                         <div class="text-answer"><?= trim((string)$a) === '' ? '<em class="muted">' . View::tr('(no answer)') . '</em>' : View::e((string)$a) ?></div>
                 <?php endswitch; ?>

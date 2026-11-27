@@ -8,6 +8,11 @@
 <form method="post" action="/admin/exam-contents" class="toolbar">
     <?= Csrf::field() ?>
     <input type="text" name="title" placeholder="<?= View::tr('New exam content title') ?>" required aria-label="<?= View::tr('New exam content title') ?>" style="margin:0;width:280px">
+    <select name="kind" aria-label="<?= View::tr('Exam type') ?>" style="margin:0;width:auto">
+        <option value="written"><?= View::tr('Written') ?></option>
+        <option value="code"><?= View::tr('Code') ?></option>
+        <option value="upload"><?= View::tr('Upload') ?></option>
+    </select>
     <button type="submit"><?= View::tr('Add exam content') ?></button>
 </form>
 
@@ -19,6 +24,7 @@
             <li>
                 <span>
                     <a href="/admin/exam-contents/<?= rawurlencode($c['id']) ?>"><?= View::e($c['title']) ?></a>
+                    <span class="badge <?= $c['kind'] === 'code' ? 'badge-blue' : '' ?>"><?= View::tr(['written' => 'Written', 'code' => 'Code', 'upload' => 'Upload'][$c['kind']]) ?></span>
                     <span class="item-meta"><?= View::tr('{n} questions · {pts} pts · used by {used} exam(s)', ['n' => count($c['questions']), 'pts' => round(Exams::contentMaxScore($c), 2), 'used' => (int)($usage[$c['id']] ?? 0)]) ?></span>
                 </span>
             </li>

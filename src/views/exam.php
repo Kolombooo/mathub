@@ -8,6 +8,9 @@
      data-start-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/start"
      data-submit-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/submit/"
      data-storage-key="mathub-exam-<?= View::e($classSlug) ?>-<?= View::e($exam['id']) ?>"
+     data-save-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/save/"
+     data-runner-url="<?= View::e(View::asset('/assets/code_runner.html')) ?>"
+     data-pyodide-base="<?= View::e(Exams::pyodideBase()) ?>"
      data-event-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/event/"
      data-settings="<?= View::e(json_encode(Exams::settingsOf($exam))) ?>"
      data-csrf="<?= View::e(Csrf::token()) ?>">
@@ -38,6 +41,10 @@
 <?php /* The 300 KB drawing library is only needed when the exam has a drawing question. */ ?>
 <?php if (array_filter((array)($exam['questions'] ?? []), fn($q) => ($q['type'] ?? '') === 'draw')): ?>
 <script src="<?= View::e(View::asset('/assets/vendor/fabric.min.js')) ?>"></script>
+<?php endif; ?>
+<?php if (($exam['kind'] ?? 'written') === 'code'): ?>
+<script src="<?= View::e(View::asset('/assets/vendor/codeeditor.min.js')) ?>"></script>
+<script src="<?= View::e(View::asset('/assets/exam_code.js')) ?>"></script>
 <?php endif; ?>
 <script src="<?= View::e(View::asset('/assets/exam.js')) ?>"></script>
 <script src="<?= View::e(View::asset('/assets/exam_guard.js')) ?>"></script>

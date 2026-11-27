@@ -82,19 +82,46 @@ if ($method === 'POST' && count($decoded) === 4 && $decoded[0] === 'exams' && $d
         'startedAt' => $sub['startedAt'],
         'serverTime' => time(),
         'exam' => Exams::publicExam($exam),
+        // Code autosaved on the server (code exams): {questionId: {code, at}}.
+        'drafts' => (object)((Exams::readDraft($classSlug, $examId, $sid)['answers'] ?? [])),
     ]);
 }
 
 // Browser telemetry: `heartbeat` pings while the exam is open, and sendBeacon events while the page is closing.
 if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $decoded[3] === 'event') {
     [, $classSlug, $examId, , $sid] = $decoded;
-    if (Csrf::verify($_POST['csrf_token'] ?? null) && ($_POST['type'] ?? '') === 'heartbeat') {
+    $csrfOk = Csrf::verify($_POST['csrf_token'] ?? null);
+    session_write_close(); // release the session lock: nothing below needs it
+    if ($csrfOk && ($_POST['type'] ?? '') === 'heartbeat') {
         Exams::addHeartbeat($classSlug, $examId, $sid, ($_POST['guard'] ?? '') === '1');
-    } elseif (Csrf::verify($_POST['csrf_token'] ?? null)) {
+    } elseif ($csrfOk) {
         Exams::addBeaconEvent($classSlug, $examId, $sid, (string)($_POST['type'] ?? ''), json_decode((string)($_POST['detail'] ?? 'null'), true));
     }
     http_response_code(204);
     exit;
+}
+
+// Code autosave: POST {payload: JSON {questionId: code}} for the assignments changed since the last save.
+// Hot path with ~50 students typing at once: it touches only the student's own draft file (no shared
+// lock, no session lock) and answers 204-sized JSON. See Exams::saveDraft().
+if ($method === 'POST' && count($decoded) === 5 && $decoded[0] === 'exams' && $decoded[3] === 'save') {
+    [, $classSlug, $examId, , $sid] = $decoded;
+    $csrfOk = Csrf::verify($_POST['csrf_token'] ?? null);
+    session_write_close();
+    if (!$csrfOk) {
+        jsonResponse(['ok' => false, 'error' => 'csrf'], 400);
+    }
+    $codes = json_decode((string)($_POST['payload'] ?? ''), true);
+    if (!is_array($codes) || strlen((string)$_POST['payload']) > 2 * 1024 * 1024) {
+        jsonResponse(['ok' => false, 'error' => 'bad_request'], 400);
+    }
+    try {
+        $at = Exams::saveDraft($classSlug, $examId, $sid, $codes);
+    } catch (StorageException $e) {
+        jsonResponse(['ok' => false, 'error' => 'storage'], 500);
+    }
+    // null = refused (too frequent, submitted, unknown): the browser just tries again later.
+    jsonResponse($at === null ? ['ok' => false, 'error' => 'retry'] : ['ok' => true, 'at' => $at], $at === null ? 429 : 200);
 }
 
 // Final submission: one multipart POST with all answers and files.
