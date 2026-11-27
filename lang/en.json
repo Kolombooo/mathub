@@ -119,5 +119,6 @@
     "builder.code_chat": "Chatbot assistant (coming soon)",
     "exam.code_console": "Console",
     "exam.code_console_input": "Type input for the program and press Enter",
-    "exam.code_waiting": "Waiting for your input…"
+    "exam.code_waiting": "Waiting for your input…",
+    "exam.code_runner_blocked": "The code runner could not start (blocked by the browser or the server). Reload the page and try again; if it keeps failing, tell your teacher."
 }

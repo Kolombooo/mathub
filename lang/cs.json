@@ -365,5 +365,6 @@
     "autosaved draft": "průběžně uložený koncept",
     "exam.code_console": "Konzole",
     "exam.code_console_input": "Napište vstup pro program a stiskněte Enter",
-    "exam.code_waiting": "Čeká na váš vstup…"
+    "exam.code_waiting": "Čeká na váš vstup…",
+    "exam.code_runner_blocked": "Spouštěč kódu se nepodařilo nastartovat (blokuje ho prohlížeč nebo server). Načtěte stránku znovu a zkuste to znovu; pokud to nepomůže, řekněte to učiteli."
 }

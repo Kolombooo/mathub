@@ -7,6 +7,16 @@
 // generated submission id (created when the student enters their name) is the
 // only credential needed to submit.
 
+/**
+ * Live console input needs cross-origin isolation (COOP/COEP headers). It is on unless the
+ * server sets MATHUB_LIVE_INPUT=0, or this browser could not start the runner while isolated
+ * (exam_code.js then sets the mathub_nolive cookie and reloads: input falls back to the input box).
+ */
+function liveInputEnabled(): bool
+{
+    return getenv('MATHUB_LIVE_INPUT') !== '0' && empty($_COOKIE['mathub_nolive']);
+}
+
 function examsUnlocked(string $classSlug, string $examId): bool
 {
     return !empty($_SESSION['exams_unlocked'][$classSlug . '/' . $examId]);
@@ -26,6 +36,26 @@ if ($method === 'POST' && $decoded === ['exams', 'enter']) {
     redirect(strpos($back, '/class/') === 0 && strpos($back, '//') === false ? $back : '/');
 }
 
+// The sandboxed code runner page. Served by PHP rather than as a static file so its
+// cross-origin isolation header can never go missing (a missing header makes the browser
+// block the iframe, and Python would "load" forever). See public/assets/exam_code.js.
+if ($method === 'GET' && $decoded === ['exams', 'code-runner']) {
+    session_write_close();
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    header_remove('Pragma');
+    header_remove('Expires');
+    // The sandboxed iframe has an opaque origin, i.e. it is "cross-origin" to the exam page, so the
+    // page may only embed it if it is explicitly allowed to (CORP cross-origin) and, when the page
+    // is isolated, carries COEP itself.
+    header('Cross-Origin-Resource-Policy: cross-origin');
+    if (liveInputEnabled()) {
+        header('Cross-Origin-Embedder-Policy: require-corp');
+    }
+    readfile(dirname(__DIR__) . '/runner/code_runner.html');
+    exit;
+}
+
 // The exam page itself (questions are loaded by exam.js after the student enters a name).
 if ($method === 'GET' && count($decoded) === 3 && $decoded[0] === 'exams') {
     [, $classSlug, $examId] = $decoded;
@@ -38,7 +68,7 @@ if ($method === 'GET' && count($decoded) === 3 && $decoded[0] === 'exams') {
         redirect('/');
     }
     $lang = Storage::getClassLang($classSlug);
-    if (($exam['kind'] ?? 'written') === 'code') {
+    if (($exam['kind'] ?? 'written') === 'code' && liveInputEnabled()) {
         // Cross-origin isolation gives the code runner SharedArrayBuffer, which lets input() /
         // prompt() wait for a line typed in the live console. The exam page only loads same-origin
         // resources, so this is safe; images in assignment text must therefore be uploaded files.
