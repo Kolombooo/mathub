@@ -26,6 +26,21 @@ if ($method === 'POST' && $decoded === ['exams', 'enter']) {
     redirect(strpos($back, '/class/') === 0 && strpos($back, '//') === false ? $back : '/');
 }
 
+// The sandboxed code runner page. Served by PHP rather than as a static file so its
+// cross-origin isolation header can never go missing (a missing header makes the browser
+// block the iframe, and Python would "load" forever). See public/assets/exam_code.js.
+if ($method === 'GET' && $decoded === ['exams', 'code-runner']) {
+    session_write_close();
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    header_remove('Pragma');
+    header_remove('Expires');
+    header('Cross-Origin-Embedder-Policy: require-corp');
+    header('Cross-Origin-Resource-Policy: same-origin');
+    readfile(dirname(__DIR__) . '/runner/code_runner.html');
+    exit;
+}
+
 // The exam page itself (questions are loaded by exam.js after the student enters a name).
 if ($method === 'GET' && count($decoded) === 3 && $decoded[0] === 'exams') {
     [, $classSlug, $examId] = $decoded;

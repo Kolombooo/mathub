@@ -305,6 +305,7 @@ self.onmessage = async function (e) {
 (function () {
     'use strict';
     var DEFAULT_TIMEOUT = { javascript: 10000, python: 30000 };
+    var INIT_TIMEOUT = 120000;     // downloading + starting Pyodide
     var HARD_CAP = 180000;         // loading + running, whatever happens
     var MAX_OUTPUT = 200000;       // characters forwarded per run
 
@@ -322,13 +323,21 @@ self.onmessage = async function (e) {
         var w = { worker: blobWorker('py-worker'), ready: false, failed: false, waiters: [], base: base };
         w.worker.onmessage = function (e) {
             var m = e.data;
-            if (m.t === 'ready') { w.ready = true; w.waiters.splice(0).forEach(function (f) { f(true); }); return; }
-            if (m.t === 'initfail') { w.failed = true; w.error = m.error; w.waiters.splice(0).forEach(function (f) { f(false); }); return; }
+            if (m.t === 'ready') { clearTimeout(w.timer); w.ready = true; w.waiters.splice(0).forEach(function (f) { f(true); }); return; }
+            if (m.t === 'initfail') { clearTimeout(w.timer); w.failed = true; w.error = m.error; w.waiters.splice(0).forEach(function (f) { f(false); }); return; }
             if (m.t === 'status' && !w.ready) { return; }
             if (current && current.worker === w.worker) { handle(m); }
         };
-        w.worker.onerror = function () { w.failed = true; w.waiters.splice(0).forEach(function (f) { f(false); }); };
+        w.worker.onerror = function () { clearTimeout(w.timer); w.failed = true; w.waiters.splice(0).forEach(function (f) { f(false); }); };
         w.worker.postMessage({ t: 'init', base: base });
+        // Never wait forever: report which URL could not be loaded.
+        w.timer = setTimeout(function () {
+            if (w.ready || w.failed) { return; }
+            w.failed = true;
+            w.error = 'timed out after ' + (INIT_TIMEOUT / 1000) + ' s loading ' + base;
+            try { w.worker.terminate(); } catch (e) { /* gone */ }
+            w.waiters.splice(0).forEach(function (f) { f(false); });
+        }, INIT_TIMEOUT);
         pyw = w;
         return w;
     }

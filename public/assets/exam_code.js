@@ -49,20 +49,36 @@
         // ------------------------------------------------------------------
         // Runner (sandboxed iframe), created on first use
         // ------------------------------------------------------------------
-        var frame = null, frameReady = false, queue = [], seq = 0, listeners = {};
+        var frame = null, frameReady = false, messageHooked = false, queue = [], seq = 0, listeners = {};
 
         function ensureFrame() {
             if (frame) { return; }
+            frameReady = false;
             frame = el('iframe', { sandbox: 'allow-scripts', allow: 'cross-origin-isolated', title: 'runner', 'aria-hidden': 'true', tabindex: '-1', class: 'code-runner-frame' });
             frame.src = app.dataset.runnerUrl;
             document.body.appendChild(frame);
-            window.addEventListener('message', function (e) {
-                if (!frame || e.source !== frame.contentWindow) { return; }
-                var m = e.data || {};
-                if (m.t === 'ready') { frameReady = true; queue.splice(0).forEach(sendToFrame); return; }
-                var l = listeners[m.id];
-                if (l) { l(m); }
-            });
+            // If the runner page never reports in (blocked by the browser, missing headers, ...)
+            // say so instead of showing "Loading…" forever; the next Run tries again.
+            var thisFrame = frame;
+            setTimeout(function () {
+                if (frame !== thisFrame || frameReady) { return; }
+                var waiting = queue.filter(function (m) { return m.t === 'run'; });
+                queue = [];
+                thisFrame.remove();
+                frame = null;
+                waiting.forEach(function (m) {
+                    var l = listeners[m.id];
+                    if (l) { l({ t: 'out', id: m.id, s: 'stderr', text: t('code_runner_blocked') + '\n' }); l({ t: 'done', id: m.id, ok: false, reason: 'crash' }); }
+                });
+            }, 8000);
+            if (!messageHooked) { messageHooked = true; window.addEventListener('message', onRunnerMessage); }
+        }
+        function onRunnerMessage(e) {
+            if (!frame || e.source !== frame.contentWindow) { return; }
+            var m = e.data || {};
+            if (m.t === 'ready') { frameReady = true; queue.splice(0).forEach(sendToFrame); return; }
+            var l = listeners[m.id];
+            if (l) { l(m); }
         }
         function sendToFrame(m) { frame.contentWindow.postMessage(m, '*'); }
         function post(m) { ensureFrame(); if (frameReady) { sendToFrame(m); } else { queue.push(m); } }

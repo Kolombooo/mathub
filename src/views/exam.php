@@ -9,7 +9,7 @@
      data-submit-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/submit/"
      data-storage-key="mathub-exam-<?= View::e($classSlug) ?>-<?= View::e($exam['id']) ?>"
      data-save-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/save/"
-     data-runner-url="<?= View::e(View::asset('/assets/code_runner.html')) ?>"
+     data-runner-url="/exams/code-runner?v=<?= (int)@filemtime(dirname(__DIR__) . '/runner/code_runner.html') ?>"
      data-pyodide-base="<?= View::e(Exams::pyodideBase()) ?>"
      data-event-url="/exams/<?= rawurlencode($classSlug) ?>/<?= rawurlencode($exam['id']) ?>/event/"
      data-settings="<?= View::e(json_encode(Exams::settingsOf($exam))) ?>"
