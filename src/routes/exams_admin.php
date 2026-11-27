@@ -149,6 +149,7 @@ if (count($decoded) >= 7 && $decoded[5] === 'submissions') {
             'classTitle' => $classTitle,
             'exam' => $exam,
             'sub' => $sub,
+            'liveDraft' => $sub['status'] === 'working' ? (Exams::readDraft($classSlug, $examId, $sid) ?? ['answers' => []]) : ['answers' => []],
             'maxScore' => Exams::maxScore($exam),
         ]);
         exit;

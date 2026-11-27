@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Code runner</title>
+<!--
+  Sandboxed code runner for code exams (exam_code.js).
+
+  Loaded in <iframe sandbox="allow-scripts"> (no allow-same-origin): this page has an
+  opaque origin, so student code can never touch the exam page, its cookies, or the
+  MatHub API with the student's session. It still may reach the internet over http(s)
+  so that `import` / micropip can fetch libraries from CDNs.
+
+  Every run happens in a Web Worker so an infinite loop can be killed from outside:
+    * JavaScript: a fresh worker per run; the code runs as an async function (top-level
+      await works) and `import` statements become dynamic imports of CDN URLs; bare
+      specifiers like 'lodash' are served from https://esm.sh/lodash.
+    * Python: one persistent Pyodide worker (WebAssembly CPython) that is reused between
+      runs, so Pyodide is only downloaded and started once. Killed on timeout / Stop.
+
+  Protocol (window.postMessage, both directions checked against event.source):
+    parent -> runner : {t:'run', id, language, code, stdin, base, timeoutMs}
+                       {t:'stop'}   {t:'preload', language, base}
+    runner -> parent : {t:'ready'}
+                       {t:'out', id, s:'stdout'|'stderr'|'info', text}
+                       {t:'img', id, url}   (matplotlib figure, PNG data URL)
+                       {t:'status', id, text}
+                       {t:'done', id, ok, reason?:'timeout'|'stopped'|'output'|'crash'}
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https: http:; worker-src blob:; connect-src https: http: data: blob:; img-src data: blob:">
+</head>
+<body>
+
+<script type="text/plain" id="js-worker">
+// ---- JavaScript worker (classic) ----
+var lines = [];
+var timers = 0;
+function send(t, o) { postMessage(Object.assign({ t: t }, o || {})); }
+function out(s, text) { send('out', { s: s, text: text }); }
+
+function fmt(v, depth) {
+    depth = depth || 0;
+    if (typeof v === 'string') { return depth ? JSON.stringify(v) : v; }
+    if (v === undefined) { return 'undefined'; }
+    if (typeof v === 'function') { return '[Function' + (v.name ? ': ' + v.name : '') + ']'; }
+    if (typeof v === 'bigint') { return v + 'n'; }
+    if (typeof v === 'symbol') { return v.toString(); }
+    if (v instanceof Error) { return v.stack || String(v); }
+    if (v === null || typeof v !== 'object') { return String(v); }
+    if (depth > 3) { return Array.isArray(v) ? '[Array]' : '[Object]'; }
+    try {
+        if (v instanceof Map) { return 'Map(' + v.size + ') {' + Array.from(v).map(function (e) { return fmt(e[0], depth + 1) + ' => ' + fmt(e[1], depth + 1); }).join(', ') + '}'; }
+        if (v instanceof Set) { return 'Set(' + v.size + ') {' + Array.from(v).map(function (e) { return fmt(e, depth + 1); }).join(', ') + '}'; }
+        if (Array.isArray(v)) { return '[' + v.map(function (e) { return fmt(e, depth + 1); }).join(', ') + ']'; }
+        return '{' + Object.keys(v).map(function (k) { return k + ': ' + fmt(v[k], depth + 1); }).join(', ') + '}';
+    } catch (e) { return '[Object]'; }
+}
+function line(args) { return Array.prototype.map.call(args, function (a) { return fmt(a); }).join(' ') + '\n'; }
+
+// Chromium refuses module workers and blob:/data: module imports inside a sandboxed
+// (opaque-origin) frame, but dynamic import() of https URLs works. So the student's code
+// runs as an async function (top-level await works) and `import` statements are turned
+// into dynamic imports. Bare specifiers ('lodash') are served from esm.sh.
+function specUrl(spec) {
+    return /^(https?:|\.{0,2}\/)/.test(spec) ? spec : 'https://esm.sh/' + spec;
+}
+var mods = 0;
+function transformImports(code) {
+    code = code.replace(/^[ \t]*import\s*(['"])([^'"\n]+)\1[ \t]*;?/gm, function (m, q, spec) {
+        return 'await __imp(' + JSON.stringify(spec) + ');';
+    });
+    code = code.replace(/^[ \t]*import\s+([\w$\s,{}*]+?)\s+from\s*(['"])([^'"\n]+)\2[ \t]*;?/gm, function (m, clause, q, spec) {
+        var v = '__m' + (mods++);
+        var out = 'const ' + v + ' = await __imp(' + JSON.stringify(spec) + ');';
+        clause = clause.trim();
+        var named = function (c) { return 'const ' + c.replace(/\s+as\s+/g, ': ') + ' = ' + v + ';'; };
+        var ns, d;
+        if (clause.charAt(0) === '{') { out += named(clause); }
+        else if ((ns = /^\*\s*as\s+([\w$]+)$/.exec(clause))) { out += 'const ' + ns[1] + ' = ' + v + ';'; }
+        else if ((d = /^([\w$]+)\s*(?:,\s*([\s\S]+))?$/.exec(clause))) {
+            out += 'const ' + d[1] + ' = ' + v + '.default;';
+            if (d[2]) {
+                var rest = d[2].trim();
+                if (rest.charAt(0) === '{') { out += named(rest); }
+                else if ((ns = /^\*\s*as\s+([\w$]+)$/.exec(rest))) { out += 'const ' + ns[1] + ' = ' + v + ';'; }
+            }
+        }
+        return out;
+    });
+    code = code.replace(/\bimport\s*\(/g, '__imp(');
+    code = code.replace(/^[ \t]*export\s+default\s+/gm, '').replace(/^[ \t]*export\s+(?=(const|let|var|function|class|async)\b)/gm, '');
+    return code;
+}
+async function __imp(spec) { return import(specUrl(String(spec))); }
+
+function waitTimers() {
+    return new Promise(function (resolve) {
+        (function check() { if (timers <= 0) { resolve(); } else { setTimeout(check, 25); } })();
+    });
+}
+
+var realSetTimeout = self.setTimeout.bind(self);
+var realClearTimeout = self.clearTimeout.bind(self);
+var realSetInterval = self.setInterval.bind(self);
+var realClearInterval = self.clearInterval.bind(self);
+var live = {};
+self.setTimeout = function (fn, ms) {
+    var args = Array.prototype.slice.call(arguments, 2);
+    timers++;
+    var id = realSetTimeout(function () { delete live[id]; timers--; if (typeof fn === 'function') { fn.apply(self, args); } }, ms);
+    live[id] = 1;
+    return id;
+};
+self.clearTimeout = function (id) { if (live[id]) { delete live[id]; timers--; } realClearTimeout(id); };
+self.setInterval = function (fn, ms) {
+    var args = Array.prototype.slice.call(arguments, 2);
+    timers++;
+    var id = realSetInterval(function () { if (typeof fn === 'function') { fn.apply(self, args); } }, ms);
+    live[id] = 1;
+    return id;
+};
+self.clearInterval = function (id) { if (live[id]) { delete live[id]; timers--; } realClearInterval(id); };
+
+['log', 'info', 'debug'].forEach(function (k) { console[k] = function () { out('stdout', line(arguments)); }; });
+['warn', 'error'].forEach(function (k) { console[k] = function () { out('stderr', line(arguments)); }; });
+console.table = function (d) { out('stdout', line([d])); };
+self.alert = function (m) { out('stdout', String(m) + '\n'); };
+self.prompt = function (m) {
+    if (m) { out('stdout', String(m)); }
+    var l = lines.length ? lines.shift() : null;
+    if (l !== null) { out('stdout', l + '\n'); } else { out('stdout', '\n'); }
+    return l;
+};
+self.addEventListener('unhandledrejection', function (e) { out('stderr', 'Unhandled promise rejection: ' + fmt(e.reason) + '\n'); });
+self.addEventListener('error', function (e) { out('stderr', (e.message || 'Error') + '\n'); });
+
+self.onmessage = async function (e) {
+    var m = e.data;
+    lines = String(m.stdin || '').split('\n');
+    if (lines.length && lines[lines.length - 1] === '') { lines.pop(); }
+    send('started');
+    try {
+        var AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        var fn = new AsyncFunction(transformImports(String(m.code)));
+        await fn();
+    } catch (err) {
+        out('stderr', (err && err.name ? err.name + ': ' + err.message : fmt(err)) + '\n');
+        send('done', { ok: false });
+        return;
+    }
+    await waitTimers();
+    send('done', { ok: true });
+};
+</script>
+
+<script type="text/plain" id="py-worker">
+// ---- Python worker (classic; Pyodide) ----
+var py = null;
+var lines = [];
+var ALIASES = { PIL: 'pillow', sklearn: 'scikit-learn', bs4: 'beautifulsoup4', yaml: 'pyyaml', cv2: 'opencv-python', dateutil: 'python-dateutil' };
+function send(t, o) { postMessage(Object.assign({ t: t }, o || {})); }
+function out(s, text) { send('out', { s: s, text: text }); }
+
+function cleanTraceback(msg) {
+    // Hide Pyodide's own frames: keep only what the student wrote.
+    var l = String(msg).split('\n'), res = [];
+    for (var i = 0; i < l.length; i++) {
+        if (/^\s+File "\/lib\/python[^"]*(pyodide|_pyodide)[^"]*"/.test(l[i])) {
+            while (i + 1 < l.length && /^\s{4,}/.test(l[i + 1]) && !/^\s+File /.test(l[i + 1])) { i++; }
+            continue;
+        }
+        res.push(l[i].replace('File "<exec>"', 'File "main.py"'));
+    }
+    return res.join('\n');
+}
+
+self.onmessage = async function (e) {
+    var m = e.data;
+    if (m.t === 'init') {
+        try {
+            send('status', { text: 'loading' });
+            importScripts(m.base + 'pyodide.js');
+            py = await loadPyodide({
+                indexURL: m.base,
+                stdout: function (s) { out('stdout', s + '\n'); },
+                stderr: function (s) { out('stderr', s + '\n'); }
+            });
+            py.setStdin({ stdin: function () {
+                if (!lines.length) { return undefined; }
+                return lines.shift();
+            } });
+            // input(): print the prompt and echo the (pre-supplied) answer, like a terminal would.
+            py.runPython([
+                "import os, sys, builtins, warnings",
+                "os.environ['MPLBACKEND']='AGG'",
+                "warnings.filterwarnings('ignore', message='FigureCanvasAgg is non-interactive')",
+                "_real_input = builtins.input",
+                "def _input(prompt=''):",
+                "    sys.stdout.write(str(prompt)); sys.stdout.flush()",
+                "    s = _real_input('')",
+                "    sys.stdout.write(s + '\\n'); sys.stdout.flush()",
+                "    return s",
+                "builtins.input = _input"
+            ].join('\n'));
+            send('ready');
+        } catch (err) {
+            send('initfail', { error: String(err && err.message || err) });
+        }
+        return;
+    }
+    if (m.t !== 'run') { return; }
+
+    lines = String(m.stdin || '').split('\n');
+    if (lines.length && lines[lines.length - 1] === '') { lines.pop(); }
+    var ok = true;
+    try {
+        send('status', { text: 'packages' });
+        // 1. Packages shipped with Pyodide (numpy, pandas, matplotlib, scipy, sympy, ...).
+        try {
+            await py.loadPackagesFromImports(m.code, {
+                messageCallback: function (s) { send('status', { text: 'pkg:' + s }); },
+                errorCallback: function (s) { out('stderr', s + '\n'); }
+            });
+        } catch (err) { /* fall through to micropip */ }
+        // 2. Anything still missing: pure-Python wheels from PyPI via micropip.
+        try {
+            var names = py.pyimport('pyodide.code').find_imports(m.code).toJs();
+            var missing = [];
+            for (var i = 0; i < names.length; i++) {
+                var found = py.runPython("import importlib.util as u\nu.find_spec(" + JSON.stringify(names[i]) + ") is not None");
+                if (!found) { missing.push(names[i]); }
+            }
+            if (missing.length) {
+                await py.loadPackage('micropip');
+                var micropip = py.pyimport('micropip');
+                for (var j = 0; j < missing.length; j++) {
+                    var pkg = ALIASES[missing[j]] || missing[j];
+                    send('status', { text: 'pkg:' + pkg });
+                    try { await micropip.install(pkg); }
+                    catch (err) { out('stderr', 'Could not install "' + pkg + '": ' + String(err && err.message || err).split('\n').pop() + '\n'); }
+                }
+            }
+        } catch (err) { /* the run below reports the real ImportError */ }
+
+        send('started');
+        var ns = py.globals.get('dict')();
+        try {
+            await py.runPythonAsync(m.code, { globals: ns });
+        } catch (err) {
+            var text = String(err && err.message || err);
+            if (/SystemExit/.test(text) && !/Traceback[\s\S]*Error/.test(text.replace(/SystemExit[\s\S]*$/, ''))) {
+                // sys.exit() / exit(): not an error
+            } else {
+                ok = false;
+                out('stderr', cleanTraceback(text).trim() + '\n');
+            }
+        } finally {
+            try { ns.destroy(); } catch (e2) { /* ignore */ }
+        }
+        // matplotlib figures -> images (AGG backend has no window to show them in)
+        try {
+            if (py.runPython("'matplotlib.pyplot' in __import__('sys').modules")) {
+                var imgs = py.runPython("import io, base64\nimport matplotlib.pyplot as _plt\n_o = []\nfor _n in _plt.get_fignums():\n    _b = io.BytesIO()\n    _plt.figure(_n).savefig(_b, format='png', dpi=100, bbox_inches='tight')\n    _o.append(base64.b64encode(_b.getvalue()).decode())\n_plt.close('all')\n_o").toJs();
+                imgs.forEach(function (b) { send('img', { url: 'data:image/png;base64,' + b }); });
+            }
+        } catch (err) { /* no figures */ }
+    } catch (err) {
+        ok = false;
+        out('stderr', String(err && err.message || err) + '\n');
+    }
+    send('done', { ok: ok });
+};
+</script>
+
+<script>
+(function () {
+    'use strict';
+    var DEFAULT_TIMEOUT = { javascript: 10000, python: 30000 };
+    var HARD_CAP = 180000;         // loading + running, whatever happens
+    var MAX_OUTPUT = 200000;       // characters forwarded per run
+
+    var current = null;            // { id, kind, worker, timer, hard, chars }
+    var pyw = null;                // { worker, ready, failed, waiters:[], base }
+
+    function post(m) { parent.postMessage(m, '*'); }
+    function blobWorker(id, opts) {
+        var url = URL.createObjectURL(new Blob([document.getElementById(id).textContent], { type: 'text/javascript' }));
+        return new Worker(url, opts);
+    }
+
+    function ensurePython(base) {
+        if (pyw && !pyw.failed) { return pyw; }
+        var w = { worker: blobWorker('py-worker'), ready: false, failed: false, waiters: [], base: base };
+        w.worker.onmessage = function (e) {
+            var m = e.data;
+            if (m.t === 'ready') { w.ready = true; w.waiters.splice(0).forEach(function (f) { f(true); }); return; }
+            if (m.t === 'initfail') { w.failed = true; w.error = m.error; w.waiters.splice(0).forEach(function (f) { f(false); }); return; }
+            if (m.t === 'status' && !w.ready) { return; }
+            if (current && current.worker === w.worker) { handle(m); }
+        };
+        w.worker.onerror = function () { w.failed = true; w.waiters.splice(0).forEach(function (f) { f(false); }); };
+        w.worker.postMessage({ t: 'init', base: base });
+        pyw = w;
+        return w;
+    }
+
+    function killPython() {
+        if (pyw) { try { pyw.worker.terminate(); } catch (e) { /* gone */ } pyw = null; }
+    }
+
+    function finish(ok, reason) {
+        if (!current) { return; }
+        var c = current;
+        current = null;
+        clearTimeout(c.timer);
+        clearTimeout(c.hard);
+        if (c.kind === 'javascript') { try { c.worker.terminate(); } catch (e) { /* gone */ } }
+        if (reason) { if (c.kind === 'python') { killPython(); } }
+        post({ t: 'done', id: c.id, ok: ok, reason: reason || null });
+    }
+
+    function handle(m) {
+        if (!current) { return; }
+        if (m.t === 'out') {
+            current.chars += m.text.length;
+            if (current.chars > MAX_OUTPUT) { finish(false, 'output'); return; }
+            post({ t: 'out', id: current.id, s: m.s, text: m.text });
+        } else if (m.t === 'img') {
+            post({ t: 'img', id: current.id, url: m.url });
+        } else if (m.t === 'status') {
+            post({ t: 'status', id: current.id, text: m.text });
+        } else if (m.t === 'started') {
+            clearTimeout(current.timer);
+            var id = current.id;
+            current.timer = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, current.timeoutMs);
+            post({ t: 'status', id: current.id, text: 'running' });
+        } else if (m.t === 'done') {
+            finish(m.ok, null);
+        }
+    }
+
+    function run(m) {
+        if (current) { finish(false, 'stopped'); }
+        var kind = m.language === 'python' ? 'python' : 'javascript';
+        var timeoutMs = Math.min(+m.timeoutMs || DEFAULT_TIMEOUT[kind], 120000);
+        current = { id: m.id, kind: kind, worker: null, chars: 0, timeoutMs: timeoutMs };
+        var id = m.id;
+        current.hard = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, HARD_CAP);
+        try {
+            if (kind === 'javascript') {
+                var w = blobWorker('js-worker');
+                current.worker = w;
+                w.onmessage = function (e) { handle(e.data); };
+                w.onerror = function (e) {
+                    if (!current || current.worker !== w) { return; }
+                    post({ t: 'out', id: id, s: 'stderr', text: (e.message || 'Worker error') + '\n' });
+                    finish(false, 'crash');
+                };
+                w.postMessage({ code: m.code, stdin: m.stdin });
+            } else {
+                var p = ensurePython(m.base);
+                current.worker = p.worker;
+                var go = function (ok) {
+                    if (!current || current.id !== id) { return; }
+                    if (!ok) {
+                        post({ t: 'out', id: id, s: 'stderr', text: 'Could not load Python (' + (p.error || 'network') + ').\n' });
+                        killPython();
+                        finish(false, 'crash');
+                        return;
+                    }
+                    p.worker.postMessage({ t: 'run', code: m.code, stdin: m.stdin });
+                };
+                if (p.ready) { go(true); } else { post({ t: 'status', id: id, text: 'loading' }); p.waiters.push(go); }
+            }
+        } catch (err) {
+            post({ t: 'out', id: id, s: 'stderr', text: String(err && err.message || err) + '\n' });
+            finish(false, 'crash');
+        }
+    }
+
+    window.addEventListener('message', function (e) {
+        if (e.source !== parent) { return; }
+        var m = e.data || {};
+        if (m.t === 'run') { run(m); }
+        else if (m.t === 'stop') { finish(false, 'stopped'); }
+        else if (m.t === 'preload' && m.language === 'python') { try { ensurePython(m.base); } catch (err) { /* run will report */ } }
+    });
+    post({ t: 'ready' });
+})();
+</script>
+</body>
+</html>

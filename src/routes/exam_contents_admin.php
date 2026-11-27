@@ -20,7 +20,7 @@ if (count($decoded) === 2 && $method === 'GET') {
 if (count($decoded) === 2 && $method === 'POST') {
     requireCsrf();
     try {
-        $id = Exams::createContent((string)($_POST['title'] ?? ''));
+        $id = Exams::createContent((string)($_POST['title'] ?? ''), [], (string)($_POST['kind'] ?? 'written'));
         redirect('/admin/exam-contents/' . rawurlencode($id));
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
@@ -40,7 +40,7 @@ if (count($decoded) === 3 && $method === 'GET') {
         'title' => $content['title'],
         'content' => $content,
         'usedBy' => Exams::contentUsage($contentId),
-        'types' => Exams::TYPES,
+        'types' => Exams::typesForKind($content['kind']),
     ]);
     exit;
 }
@@ -64,7 +64,7 @@ if (count($decoded) === 4 && $decoded[3] === 'duplicate' && $method === 'POST') 
         $newTitle = $content['title'] . ' (copy)';
     }
     try {
-        $copy = Exams::createContent(mb_substr($newTitle, 0, 200), $content['questions']);
+        $copy = Exams::createContent(mb_substr($newTitle, 0, 200), $content['questions'], $content['kind']);
     } catch (StorageException $e) {
         flash('error', $e->getMessage());
         redirect($contentBase);

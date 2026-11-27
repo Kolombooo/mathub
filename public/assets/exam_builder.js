@@ -16,7 +16,8 @@
     var LABELS = {
         radio: t('type.radio', 'Radio'), checkbox: t('type.checkbox', 'Checkbox'), select: t('type.select', 'Select'),
         short_text: t('type.short_text', 'Short text'), number: t('type.number', 'Number'), long_text: t('type.long_text', 'Long text'),
-        match: t('type.match', 'Connect A to B'), upload: t('type.upload', 'Upload file'), draw: t('type.draw', 'Draw')
+        match: t('type.match', 'Connect A to B'), upload: t('type.upload', 'Upload file'), draw: t('type.draw', 'Draw'),
+        code: t('type.code', 'Assignment')
     };
 
     function el(tag, attrs, children) {
@@ -45,6 +46,12 @@
             if (type === 'number') { q.tolerance = 0; }
         } else if (type === 'match') {
             q.pairs = [{ left: '', right: '' }, { left: '', right: '' }];
+        } else if (type === 'code') {
+            q.points = 10;
+            q.description = '';
+            q.language = 'python';
+            q.starter = '';
+            q.chat = false;
         }
         return q;
     }
@@ -118,10 +125,62 @@
         return wrap;
     }
 
+    // Code assignment: title, language, Markdown description, starting code (with the
+    // same highlighting editor the students get), and the reserved chatbot switch.
+    var editors = [];
+    function codeEditor(q) {
+        var wrap = el('div', { class: 'opts code-opts' });
+
+        var lang = el('select', {}, [
+            el('option', { value: 'python', text: 'Python' }),
+            el('option', { value: 'javascript', text: 'JavaScript' })
+        ]);
+        lang.value = q.language || 'python';
+        var holder = el('div', { class: 'code-editor code-editor-builder' });
+        var editor = null;
+        function mount() {
+            if (editor) { editor.destroy(); editors.splice(editors.indexOf(editor), 1); }
+            holder.innerHTML = '';
+            if (!window.MathubCode) {
+                var fallback = el('textarea', { rows: '8', class: 'mono' });
+                fallback.value = q.starter || '';
+                fallback.addEventListener('input', function () { q.starter = fallback.value; });
+                holder.appendChild(fallback);
+                return;
+            }
+            editor = window.MathubCode.create(holder, {
+                doc: q.starter || '', language: q.language || 'python', label: t('code_starter', 'Starting code'),
+                onChange: function (v) { q.starter = v; }
+            });
+            editors.push(editor);
+        }
+        lang.addEventListener('change', function () { q.language = lang.value; mount(); });
+
+        var desc = el('textarea', { rows: '8', class: 'mono', placeholder: t('code_description_ph', 'Assignment text in Markdown…') });
+        desc.value = q.description || '';
+        desc.addEventListener('input', function () { q.description = desc.value; });
+
+        var chat = el('input', { type: 'checkbox', disabled: 'disabled' });
+        chat.checked = !!q.chat;
+
+        wrap.appendChild(el('label', { class: 'inline-label' }, [document.createTextNode(t('code_language', 'Language')), lang]));
+        wrap.appendChild(el('label', {}, [document.createTextNode(t('code_description', 'Description (Markdown) – shown in the “Zadání” tab')), desc]));
+        wrap.appendChild(el('p', { class: 'muted', text: t('code_starter_hint', 'Starting code – shown in the “Kód” tab (optional).') }));
+        wrap.appendChild(holder);
+        wrap.appendChild(el('label', { class: 'inline-label' }, [chat, document.createTextNode(' ' + t('code_chat', 'Chatbot assistant (coming soon)'))]));
+        mount();
+        return wrap;
+    }
+
     function render() {
+        editors.forEach(function (e) { e.destroy(); });
+        editors = [];
         container.innerHTML = '';
         questions.forEach(function (q, i) {
-            var text = el('textarea', { rows: '2', placeholder: t('question_text', 'Question text') });
+            var isCode = q.type === 'code';
+            var text = isCode
+                ? el('input', { type: 'text', maxlength: '200', placeholder: t('code_title', 'Assignment title') })
+                : el('textarea', { rows: '2', placeholder: t('question_text', 'Question text') });
             text.value = q.text || '';
             text.addEventListener('input', function () { q.text = text.value; });
 
@@ -130,7 +189,8 @@
             pts.addEventListener('input', function () { q.points = parseFloat(pts.value) || 0; });
 
             var body = null;
-            if (q.options) { body = optionsEditor(q); }
+            if (isCode) { body = codeEditor(q); }
+            else if (q.options) { body = optionsEditor(q); }
             else if (q.accepted) { body = acceptedEditor(q); }
             else if (q.pairs) { body = pairsEditor(q); }
             else { body = el('p', { class: 'muted', text: t('manual', 'Scored by hand.') }); }

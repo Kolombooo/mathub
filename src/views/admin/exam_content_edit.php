@@ -3,7 +3,9 @@
     <a href="/admin"><?= View::tr('Admin') ?></a> &rsaquo;
     <a href="/admin/exam-contents"><?= View::tr('Exam content library') ?></a>
 </p>
-<h1><?= View::tr('Edit exam content') ?></h1>
+<h1><?= View::tr('Edit exam content') ?>
+    <span class="badge <?= $content['kind'] === 'code' ? 'badge-blue' : '' ?>"><?= View::tr(['written' => 'Written', 'code' => 'Code', 'upload' => 'Upload'][$content['kind']]) ?></span>
+</h1>
 
 <?php if ($usedBy): ?>
     <p class="notice"><?= View::tr('Used by:') ?>
@@ -20,10 +22,21 @@
         <input type="text" name="title" value="<?= View::e($content['title']) ?>" required>
     </label>
 
-    <h2><?= View::tr('Questions') ?></h2>
-    <p class="empty"><?= View::tr('Correct answers are optional. Questions without one (and long text, file upload and drawing) are scored by hand. Students never see scores.') ?></p>
+    <?php $isCode = $content['kind'] === 'code'; ?>
+    <h2><?= View::tr($isCode ? 'Assignments' : 'Questions') ?></h2>
+    <?php if ($isCode): ?>
+        <p class="empty"><?= View::tr('Each assignment has a description written in Markdown (tab "Zadání"), a language and optional starting code (tab "Kód"). Code runs in the student\'s browser; there are no automatic tests, so you score the submitted code by hand. Students never see scores.') ?></p>
+    <?php elseif ($content['kind'] === 'upload'): ?>
+        <p class="empty"><?= View::tr('Each question asks the student to upload a file. Uploads are scored by hand.') ?></p>
+    <?php else: ?>
+        <p class="empty"><?= View::tr('Correct answers are optional. Questions without one (and long text, file upload and drawing) are scored by hand. Students never see scores.') ?></p>
+    <?php endif; ?>
     <div id="questions"></div>
     <div class="builder-add">
+        <?php if ($isCode || $content['kind'] === 'upload'): ?>
+            <input type="hidden" id="add-type" value="<?= $isCode ? 'code' : 'upload' ?>">
+            <button type="button" id="add-question"><?= View::tr($isCode ? '+ Add assignment' : '+ Add question') ?></button>
+        <?php else: ?>
         <select id="add-type">
             <option value="radio"><?= View::tr('Radio (one choice)') ?></option>
             <option value="checkbox"><?= View::tr('Checkbox (multiple choice)') ?></option>
@@ -36,6 +49,7 @@
             <option value="draw"><?= View::tr('Draw') ?></option>
         </select>
         <button type="button" id="add-question"><?= View::tr('+ Add question') ?></button>
+        <?php endif; ?>
     </div>
 
     <input type="hidden" name="questions" id="questions-json">
@@ -89,4 +103,7 @@
 
 <script type="application/json" id="exam-data"><?= json_encode($content['questions'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
 <script type="application/json" id="builder-i18n"><?= json_encode(I18n::group(I18n::defaultLang(), 'builder.'), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+<?php if ($content['kind'] === 'code'): ?>
+<script src="<?= View::e(View::asset('/assets/vendor/codeeditor.min.js')) ?>"></script>
+<?php endif; ?>
 <script src="<?= View::e(View::asset('/assets/exam_builder.js')) ?>"></script>

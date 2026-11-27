@@ -2,7 +2,18 @@
 
 final class Exams
 {
-    public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'upload', 'draw'];
+    public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'upload', 'draw', 'code'];
+
+    /**
+     * Exam content kinds. `written` = the classic question types, `upload` = file
+     * upload questions only, `code` = a list of coding assignments (one `code`
+     * question each). The kind is chosen when the content is created.
+     */
+    public const KINDS = ['written', 'code', 'upload'];
+    public const CODE_LANGUAGES = ['python', 'javascript'];
+    public const MAX_CODE_CHARS = 100000;
+    /** Per-student server draft of code answers (autosave); see saveDraft(). */
+    private const DRAFT_MIN_INTERVAL_SEC = 1;
 
     /** Event types the teacher should see in red. */
     public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened', 'heartbeat_lost', 'guard_missing', 'late_submit'];
@@ -92,6 +103,7 @@ final class Exams
             $c = self::readJson($file);
             if ($c !== null && isset($c['id'])) {
                 $c['questions'] = (array)($c['questions'] ?? []);
+                $c['kind'] = self::kindOf($c);
                 $out[] = $c;
             }
         }
@@ -107,12 +119,42 @@ final class Exams
         $c = self::readJson(self::contentsDir() . '/' . $id . '.json');
         if ($c !== null) {
             $c['questions'] = (array)($c['questions'] ?? []);
+            $c['kind'] = self::kindOf($c);
         }
         return $c;
     }
 
-    public static function createContent(string $title, array $questions = []): string
+    /**
+     * Where Pyodide (Python in the browser) is loaded from. Pinned to one release so
+     * an upstream update cannot change behaviour mid-exam. Override with the
+     * MATHUB_PYODIDE_URL environment variable (must end in "/") to self-host.
+     */
+    public static function pyodideBase(): string
     {
+        $url = (string)getenv('MATHUB_PYODIDE_URL');
+        return $url !== '' ? rtrim($url, '/') . '/' : 'https://cdn.jsdelivr.net/pyodide/v314.0.8/full/';
+    }
+
+    public static function kindOf(array $content): string
+    {
+        return in_array($content['kind'] ?? '', self::KINDS, true) ? $content['kind'] : 'written';
+    }
+
+    /** Question types a content of this kind may contain. */
+    public static function typesForKind(string $kind): array
+    {
+        if ($kind === 'code') {
+            return ['code'];
+        }
+        if ($kind === 'upload') {
+            return ['upload'];
+        }
+        return array_values(array_diff(self::TYPES, ['code']));
+    }
+
+    public static function createContent(string $title, array $questions = [], string $kind = 'written'): string
+    {
+        $kind = in_array($kind, self::KINDS, true) ? $kind : 'written';
         $title = trim($title);
         if ($title === '') {
             throw new StorageException(I18n::ui('Exam content title cannot be empty.'));
@@ -128,6 +170,7 @@ final class Exams
             'title' => mb_substr($title, 0, 200),
             'createdAt' => time(),
             'updatedAt' => time(),
+            'kind' => $kind,
             'questions' => $questions,
         ]);
         return $id;
@@ -144,7 +187,11 @@ final class Exams
             throw new StorageException(I18n::ui('Exam content title cannot be empty.'));
         }
         $c['title'] = mb_substr($title, 0, 200);
-        $c['questions'] = self::normalizeQuestions($rawQuestions);
+        $allowed = self::typesForKind($c['kind']);
+        $c['questions'] = array_values(array_filter(
+            self::normalizeQuestions($rawQuestions),
+            fn($q) => in_array($q['type'], $allowed, true)
+        ));
         $c['updatedAt'] = time();
         self::writeJson(self::contentsDir() . '/' . $id . '.json', $c);
     }
@@ -196,6 +243,7 @@ final class Exams
         if (!empty($exam['contentId'])) {
             $content = self::getContent((string)$exam['contentId']);
             $exam['questions'] = $content['questions'] ?? [];
+            $exam['kind'] = $content !== null ? $content['kind'] : 'written';
             $exam['contentTitle'] = $content['title'] ?? null;
         } else {
             $exam['questions'] = (array)($exam['questions'] ?? []);
@@ -504,6 +552,15 @@ final class Exams
                 if ($type === 'number') {
                     $item['tolerance'] = max(0.0, (float)str_replace(',', '.', (string)($q['tolerance'] ?? 0)));
                 }
+            } elseif ($type === 'code') {
+                // `text` is the assignment title (shown in the student's sidebar).
+                $item['text'] = mb_substr($item['text'], 0, 200);
+                $item['description'] = $str($q['description'] ?? '', 20000);
+                $item['language'] = in_array($q['language'] ?? '', self::CODE_LANGUAGES, true) ? $q['language'] : 'python';
+                $item['starter'] = mb_substr(str_replace("\r\n", "\n", (string)($q['starter'] ?? '')), 0, 50000);
+                // Reserved: the guarded chatbot is not implemented yet; the flag is stored so
+                // content written today keeps working once it is.
+                $item['chat'] = !empty($q['chat']);
             } elseif ($type === 'match') {
                 $item['pairs'] = [];
                 foreach ((array)($q['pairs'] ?? []) as $p) {
@@ -533,13 +590,19 @@ final class Exams
             if (isset($q['options'])) {
                 $p['options'] = array_map(fn($o) => ['id' => $o['id'], 'text' => $o['text']], $q['options']);
             }
+            if ($q['type'] === 'code') {
+                $p['descriptionHtml'] = Markdown::toHtml((string)($q['description'] ?? ''));
+                $p['language'] = $q['language'] ?? 'python';
+                $p['starter'] = (string)($q['starter'] ?? '');
+                $p['chat'] = !empty($q['chat']);
+            }
             if (isset($q['pairs'])) {
                 $p['lefts'] = array_map(fn($x) => ['id' => $x['id'], 'text' => $x['left']], $q['pairs']);
                 $p['rights'] = array_map(fn($x) => ['id' => $x['id'], 'text' => $x['right']], $q['pairs']);
             }
             $questions[] = $p;
         }
-        return ['id' => $exam['id'], 'title' => $exam['title'], 'questions' => $questions, 'settings' => self::settingsOf($exam)];
+        return ['id' => $exam['id'], 'title' => $exam['title'], 'kind' => $exam['kind'] ?? 'written', 'questions' => $questions, 'settings' => self::settingsOf($exam)];
     }
 
     public static function maxScore(array $exam): float
@@ -568,6 +631,8 @@ final class Exams
             'answers' => new stdClass(),
             'scores' => new stdClass(),
             'comment' => '',
+            // Reserved for the guarded chatbot: { questionId: [ {role, text, at}, ... ] }
+            'chats' => new stdClass(),
             'events' => [],
         ]);
         return $sid;
@@ -665,6 +730,7 @@ final class Exams
         }
         @unlink($dir . '/submissions/' . $sid . '.json');
         @unlink($dir . '/submissions/' . $sid . '.json.lock');
+        @unlink($dir . '/drafts/' . $sid . '.json');
         self::rrmdir($dir . '/files/' . $sid);
     }
 
@@ -692,10 +758,14 @@ final class Exams
             }
 
             $raw = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
+            $draft = self::readDraft($classSlug, $examId, $sid);
             $answers = [];
             $scores = [];
             foreach ($exam['questions'] as $q) {
                 $qid = $q['id'];
+                if ($q['type'] === 'code' && !is_string($raw[$qid] ?? null) && isset($draft['answers'][$qid]['code'])) {
+                    $raw[$qid] = $draft['answers'][$qid]['code']; // the browser sent nothing: keep the autosaved code
+                }
                 $answer = self::cleanAnswer($q, $raw[$qid] ?? null);
                 if ($q['type'] === 'upload' || $q['type'] === 'draw') {
                     $answer = self::storeFile($classSlug, $examId, $sid, $q, $files['file_' . $qid] ?? null);
@@ -749,6 +819,9 @@ final class Exams
             $sub['events'] = array_slice($events, 0, self::MAX_EVENTS);
             return $sub;
         });
+        if ($saved !== null) {
+            self::closeDraft($classSlug, $examId, $sid);
+        }
         if ($saved === null) {
             throw new StorageException(I18n::ui('Unknown submission.'));
         }
@@ -886,6 +959,8 @@ final class Exams
                 return mb_substr(trim((string)(is_scalar($value) ? $value : '')), 0, 50);
             case 'long_text':
                 return mb_substr((string)(is_scalar($value) ? $value : ''), 0, 20000);
+            case 'code':
+                return mb_substr(str_replace("\r\n", "\n", (string)(is_string($value) ? $value : '')), 0, self::MAX_CODE_CHARS);
             case 'match':
                 $lefts = array_column($q['pairs'], 'id');
                 $out = [];
@@ -945,6 +1020,85 @@ final class Exams
         }
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         return ['path' => $path, 'inline' => in_array($ext, self::INLINE_IMAGE_EXT, true), 'ext' => $ext];
+    }
+
+    // ---------- Code autosave (server drafts) ----------
+    //
+    // While a student writes code the browser sends changed assignments every few
+    // seconds. Drafts live in their own file per student (drafts/<sid>.json), NOT
+    // in the submission: that file is locked and rewritten by heartbeats, events
+    // and the final submit, and with ~50 students typing at once every autosave
+    // would queue behind them. A draft has exactly one writer (its student's
+    // browser, one request in flight at a time), so a plain atomic
+    // write-temp-and-rename is enough, with no locking and no contention.
+
+    private static function draftPath(string $classSlug, string $examId, string $sid): ?string
+    {
+        $dir = self::examDir($classSlug, $examId);
+        return ($dir === null || !self::validSid($sid)) ? null : $dir . '/drafts/' . $sid . '.json';
+    }
+
+    /** @return array{answers: array<string, array{code: string, at: int}>, final?: bool}|null */
+    public static function readDraft(string $classSlug, string $examId, string $sid): ?array
+    {
+        $path = self::draftPath($classSlug, $examId, $sid);
+        $d = $path === null ? null : self::readJson($path);
+        if ($d === null) {
+            return null;
+        }
+        $d['answers'] = (array)($d['answers'] ?? []);
+        return $d;
+    }
+
+    /**
+     * Stores the given code answers ({questionId: code}) into the student's draft.
+     * Returns the server time of the save, or null when it was refused: unknown
+     * student, already submitted, or saving faster than DRAFT_MIN_INTERVAL_SEC.
+     */
+    public static function saveDraft(string $classSlug, string $examId, string $sid, array $codes): ?int
+    {
+        $path = self::draftPath($classSlug, $examId, $sid);
+        if ($path === null || !is_file(dirname($path, 2) . '/submissions/' . $sid . '.json')) {
+            return null;
+        }
+        $exam = self::getExam($classSlug, $examId);
+        if ($exam === null || empty($exam['published'])) {
+            return null;
+        }
+        $draft = self::readDraft($classSlug, $examId, $sid) ?? ['answers' => []];
+        if (!empty($draft['final'])) {
+            return null;
+        }
+        clearstatcache(true, $path);
+        $now = time();
+        if (is_file($path) && $now - (int)filemtime($path) < self::DRAFT_MIN_INTERVAL_SEC) {
+            return null;
+        }
+        $known = [];
+        foreach ($exam['questions'] as $q) {
+            if ($q['type'] === 'code') {
+                $known[$q['id']] = $q;
+            }
+        }
+        foreach ($codes as $qid => $code) {
+            if (isset($known[(string)$qid]) && is_string($code)) {
+                $draft['answers'][(string)$qid] = [
+                    'code' => self::cleanAnswer($known[(string)$qid], $code),
+                    'at' => $now,
+                ];
+            }
+        }
+        self::writeJson($path, $draft);
+        return $now;
+    }
+
+    /** Marks the draft closed after the final submit so a late autosave cannot revive it. */
+    private static function closeDraft(string $classSlug, string $examId, string $sid): void
+    {
+        $path = self::draftPath($classSlug, $examId, $sid);
+        if ($path !== null) {
+            self::writeJson($path, ['answers' => new stdClass(), 'final' => true]);
+        }
     }
 
     // ---------- Scoring ----------
