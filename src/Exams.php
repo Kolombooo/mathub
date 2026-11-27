@@ -2,21 +2,24 @@
 
 final class Exams
 {
-    public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'upload', 'draw', 'code'];
+    public const TYPES = ['radio', 'checkbox', 'select', 'short_text', 'number', 'long_text', 'match', 'draw', 'code', 'essay'];
 
     /**
-     * Exam content kinds. `written` = the classic question types, `upload` = file
-     * upload questions only, `code` = a list of coding assignments (one `code`
-     * question each). The kind is chosen when the content is created.
+     * Exam content kinds. `written` = the classic question types, `code` = a list
+     * of coding assignments (one `code` question each), `essay` = one long-form
+     * document (a single `essay` question). The kind is chosen when the content
+     * is created.
      */
-    public const KINDS = ['written', 'code', 'upload'];
+    public const KINDS = ['written', 'code', 'essay'];
+    /** Essay answers are HTML (see cleanEssayHtml); pasted pictures are inline data URIs. */
+    public const MAX_ESSAY_BYTES = 8 * 1024 * 1024;
     public const CODE_LANGUAGES = ['python', 'javascript'];
     public const MAX_CODE_CHARS = 100000;
     /** Per-student server draft of code answers (autosave); see saveDraft(). */
     private const DRAFT_MIN_INTERVAL_SEC = 1;
 
     /** Event types the teacher should see in red. */
-    public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened', 'heartbeat_lost', 'guard_missing', 'late_submit'];
+    public const FLAG_TYPES = ['left_page', 'fullscreen_exit', 'page_closed', 'page_reopened', 'heartbeat_lost', 'guard_missing', 'late_submit', 'paste_blocked'];
     /** Events the browser may report on its own while the page is going away. */
     public const BEACON_TYPES = ['page_closed'];
     /**
@@ -30,12 +33,11 @@ final class Exams
     public const HEARTBEAT_SEC = 10;
     /** Silence longer than this is recorded as `heartbeat_lost`. */
     public const HEARTBEAT_GAP_SEC = 45;
-    /** Slack on the time limit for slow uploads / clock skew before a submission counts as late. */
+    /** Slack on the time limit for slow connections / clock skew before a submission counts as late. */
     public const TIME_GRACE_SEC = 60;
     private const MAX_EVENTS = 1000;
 
     public const MAX_FILE_BYTES = 10 * 1024 * 1024;
-    private const UPLOAD_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'doc', 'docx', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'zip'];
     private const INLINE_IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
     // ---------- Paths / ids ----------
@@ -102,7 +104,7 @@ final class Exams
         foreach (glob(self::contentsDir() . '/*.json') ?: [] as $file) {
             $c = self::readJson($file);
             if ($c !== null && isset($c['id'])) {
-                $c['questions'] = (array)($c['questions'] ?? []);
+                $c['questions'] = self::knownQuestions($c['questions'] ?? []);
                 $c['kind'] = self::kindOf($c);
                 $out[] = $c;
             }
@@ -118,7 +120,7 @@ final class Exams
         }
         $c = self::readJson(self::contentsDir() . '/' . $id . '.json');
         if ($c !== null) {
-            $c['questions'] = (array)($c['questions'] ?? []);
+            $c['questions'] = self::knownQuestions($c['questions'] ?? []);
             $c['kind'] = self::kindOf($c);
         }
         return $c;
@@ -135,6 +137,12 @@ final class Exams
         return $url !== '' ? rtrim($url, '/') . '/' : 'https://cdn.jsdelivr.net/pyodide/v314.0.8/full/';
     }
 
+    /** Drops questions of types that no longer exist (e.g. the removed file upload). */
+    private static function knownQuestions($questions): array
+    {
+        return array_values(array_filter((array)$questions, fn($q) => is_array($q) && in_array($q['type'] ?? '', self::TYPES, true)));
+    }
+
     public static function kindOf(array $content): string
     {
         return in_array($content['kind'] ?? '', self::KINDS, true) ? $content['kind'] : 'written';
@@ -146,10 +154,10 @@ final class Exams
         if ($kind === 'code') {
             return ['code'];
         }
-        if ($kind === 'upload') {
-            return ['upload'];
+        if ($kind === 'essay') {
+            return ['essay'];
         }
-        return array_values(array_diff(self::TYPES, ['code']));
+        return array_values(array_diff(self::TYPES, ['code', 'essay']));
     }
 
     public static function createContent(string $title, array $questions = [], string $kind = 'written'): string
@@ -192,6 +200,9 @@ final class Exams
             self::normalizeQuestions($rawQuestions),
             fn($q) => in_array($q['type'], $allowed, true)
         ));
+        if ($c['kind'] === 'essay') {
+            $c['questions'] = array_slice($c['questions'], 0, 1); // one document per exam
+        }
         $c['updatedAt'] = time();
         self::writeJson(self::contentsDir() . '/' . $id . '.json', $c);
     }
@@ -246,7 +257,7 @@ final class Exams
             $exam['kind'] = $content !== null ? $content['kind'] : 'written';
             $exam['contentTitle'] = $content['title'] ?? null;
         } else {
-            $exam['questions'] = (array)($exam['questions'] ?? []);
+            $exam['questions'] = self::knownQuestions($exam['questions'] ?? []);
             $exam['contentTitle'] = null;
         }
         return $exam;
@@ -561,6 +572,9 @@ final class Exams
                 // Reserved: the guarded chatbot is not implemented yet; the flag is stored so
                 // content written today keeps working once it is.
                 $item['chat'] = !empty($q['chat']);
+            } elseif ($type === 'essay') {
+                // `text` is the prompt shown above the document.
+                $item['text'] = $str($q['text'] ?? '', 5000);
             } elseif ($type === 'match') {
                 $item['pairs'] = [];
                 foreach ((array)($q['pairs'] ?? []) as $p) {
@@ -767,7 +781,7 @@ final class Exams
                     $raw[$qid] = $draft['answers'][$qid]['code']; // the browser sent nothing: keep the autosaved code
                 }
                 $answer = self::cleanAnswer($q, $raw[$qid] ?? null);
-                if ($q['type'] === 'upload' || $q['type'] === 'draw') {
+                if ($q['type'] === 'draw') {
                     $answer = self::storeFile($classSlug, $examId, $sid, $q, $files['file_' . $qid] ?? null);
                 }
                 $answers[$qid] = $answer;
@@ -919,6 +933,8 @@ final class Exams
                 return [I18n::ui('Monitoring script never reported in (blocked or tampered with)'), true];
             case 'late_submit':
                 return [I18n::ui('Submitted {time} after the time limit', ['time' => $time]), true];
+            case 'paste_blocked':
+                return [I18n::ui('Tried to paste text that was not copied from this site'), true];
             case 'fullscreen_unsupported':
                 return [I18n::ui('Browser does not support fullscreen'), false];
         }
@@ -959,6 +975,8 @@ final class Exams
                 return mb_substr(trim((string)(is_scalar($value) ? $value : '')), 0, 50);
             case 'long_text':
                 return mb_substr((string)(is_scalar($value) ? $value : ''), 0, 20000);
+            case 'essay':
+                return self::cleanEssayHtml(is_string($value) ? $value : '');
             case 'code':
                 return mb_substr(str_replace("\r\n", "\n", (string)(is_string($value) ? $value : '')), 0, self::MAX_CODE_CHARS);
             case 'match':
@@ -982,20 +1000,13 @@ final class Exams
         if ($file['error'] !== UPLOAD_ERR_OK || $file['size'] > self::MAX_FILE_BYTES) {
             throw new StorageException(I18n::ui('A file is too large or failed to upload.'));
         }
-        $originalName = mb_substr(basename((string)$file['name']), 0, 150);
-        if ($q['type'] === 'draw') {
-            $info = @getimagesize($file['tmp_name']);
-            if ($info === false || $info[2] !== IMAGETYPE_PNG) {
-                throw new StorageException(I18n::ui('Invalid drawing.'));
-            }
-            $ext = 'png';
-            $originalName = 'drawing.png';
-        } else {
-            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-            if (!in_array($ext, self::UPLOAD_EXT, true)) {
-                throw new StorageException(I18n::ui('File type not allowed: .{ext}', ['ext' => $ext]));
-            }
+        // The only file answer left is a drawing: a PNG made by the in-page editor.
+        $info = @getimagesize($file['tmp_name']);
+        if ($info === false || $info[2] !== IMAGETYPE_PNG) {
+            throw new StorageException(I18n::ui('Invalid drawing.'));
         }
+        $ext = 'png';
+        $originalName = 'drawing.png';
         $dir = self::examDir($classSlug, $examId) . '/files/' . $sid;
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
@@ -1101,6 +1112,140 @@ final class Exams
         }
     }
 
+    // ---------- Essay documents ----------
+    //
+    // The student writes in a contenteditable page, so the answer is HTML sent by
+    // a browser we do not control. It is rebuilt from an allow-list on the server
+    // and only the rebuilt markup is ever stored or shown to the teacher.
+
+    private const ESSAY_TAGS = ['p', 'div', 'br', 'b', 'strong', 'i', 'em', 'u', 's', 'strike', 'sub', 'sup', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'span', 'img'];
+    private const ESSAY_DROP = ['script', 'style', 'iframe', 'object', 'embed', 'noscript', 'template', 'svg', 'math', 'form', 'select', 'textarea', 'button', 'head', 'title', 'link', 'meta'];
+    public const ESSAY_FONTS = ['Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New'];
+    private const ESSAY_SIZES = ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large'];
+
+    /** Keeps only the formatting the essay toolbar can produce. Returns '' for an empty document. */
+    public static function cleanEssayHtml(string $html): string
+    {
+        if (strlen($html) > self::MAX_ESSAY_BYTES * 2) {
+            throw new StorageException(I18n::ui('The essay is too long.'));
+        }
+        if (trim($html) === '') {
+            return '';
+        }
+        $prev = libxml_use_internal_errors(true);
+        $doc = new DOMDocument();
+        $doc->loadHTML('<?xml encoding="utf-8"?><body>' . $html . '</body>', LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        $body = $doc->getElementsByTagName('body')->item(0);
+        $out = $body ? self::essayChildren($body) : '';
+        if (strlen($out) > self::MAX_ESSAY_BYTES) {
+            throw new StorageException(I18n::ui('The essay is too long.'));
+        }
+        return self::essayText($out) === '' && strpos($out, '<img') === false ? '' : $out;
+    }
+
+    private static function essayChildren(DOMNode $node): string
+    {
+        $out = '';
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMText) {
+                $out .= htmlspecialchars($child->data, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                continue;
+            }
+            if (!($child instanceof DOMElement)) {
+                continue;
+            }
+            $tag = strtolower($child->tagName);
+            if (in_array($tag, self::ESSAY_DROP, true)) {
+                continue;
+            }
+            if (!in_array($tag, self::ESSAY_TAGS, true)) {
+                $out .= self::essayChildren($child); // unknown wrapper (a, font, table...): keep its text
+                continue;
+            }
+            if ($tag === 'br') {
+                $out .= '<br>';
+            } elseif ($tag === 'img') {
+                $src = trim($child->getAttribute('src'));
+                if (preg_match('#^data:image/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$#', $src)) {
+                    $out .= '<img src="' . $src . '" alt="">';
+                }
+            } else {
+                $style = $tag === 'span' || $tag === 'div' || $tag === 'p' || preg_match('/^h[1-3]$/', $tag) || $tag === 'li' || $tag === 'blockquote'
+                    ? self::essayStyle($child->getAttribute('style')) : '';
+                $inner = self::essayChildren($child);
+                if (($tag === 'span') && $style === '') {
+                    $out .= $inner;
+                } else {
+                    $out .= '<' . $tag . ($style !== '' ? ' style="' . $style . '"' : '') . '>' . $inner . '</' . $tag . '>';
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** Re-emits only the harmless declarations the toolbar produces. */
+    private static function essayStyle(string $style): string
+    {
+        $keep = [];
+        foreach (explode(';', $style) as $decl) {
+            $pair = explode(':', $decl, 2);
+            if (count($pair) !== 2) {
+                continue;
+            }
+            $prop = strtolower(trim($pair[0]));
+            $val = strtolower(trim(str_replace(['"', "'"], '', $pair[1])));
+            if ($prop === 'font-family') {
+                $first = trim(explode(',', $val)[0]);
+                foreach (self::ESSAY_FONTS as $f) {
+                    if (strtolower($f) === $first) {
+                        $keep[$prop] = '\'' . $f . '\'';
+                    }
+                }
+            } elseif ($prop === 'font-size') {
+                if (in_array($val, self::ESSAY_SIZES, true) || preg_match('/^([89]|[1-6][0-9]|7[0-2])(\.\d+)?px$/', $val)) {
+                    $keep[$prop] = $val;
+                }
+            } elseif ($prop === 'text-align' && in_array($val, ['left', 'center', 'right', 'justify'], true)) {
+                $keep[$prop] = $val;
+            } elseif ($prop === 'font-weight' && ($val === 'bold' || $val === 'bolder' || (ctype_digit($val) && (int)$val >= 600))) {
+                $keep[$prop] = 'bold';
+            } elseif ($prop === 'font-style' && $val === 'italic') {
+                $keep[$prop] = 'italic';
+            } elseif ($prop === 'text-decoration' || $prop === 'text-decoration-line') {
+                $deco = array_intersect(preg_split('/\s+/', $val) ?: [], ['underline', 'line-through']);
+                if ($deco) {
+                    $keep['text-decoration'] = implode(' ', $deco);
+                }
+            }
+        }
+        $parts = [];
+        foreach ($keep as $k => $v) {
+            $parts[] = $k . ':' . $v;
+        }
+        return htmlspecialchars(implode(';', $parts), ENT_QUOTES, 'UTF-8');
+    }
+
+    /** Plain text of a (cleaned) essay, blocks separated by newlines. */
+    public static function essayText(string $html): string
+    {
+        $text = preg_replace('#<br\s*/?>|</?(p|div|li|ul|ol|h[1-3]|blockquote)\b[^>]*>#i', "\n", $html);
+        $text = html_entity_decode(strip_tags((string)$text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return trim($text);
+    }
+
+    /** @return array{words:int, letters:int, images:int} what the student saw in the counter */
+    public static function essayStats(string $html): array
+    {
+        $text = self::essayText($html);
+        return [
+            'words' => (int)preg_match_all('/[\p{L}\p{N}]+(?:[\'’\-][\p{L}\p{N}]+)*/u', $text),
+            'letters' => (int)preg_match_all('/\p{L}/u', $text),
+            'images' => substr_count($html, '<img'),
+        ];
+    }
+
     // ---------- Scoring ----------
 
     private static function norm(string $s): string
@@ -1174,7 +1319,7 @@ final class Exams
                 }
                 return round($pts * $right / count($q['pairs']), 2);
         }
-        return null; // long_text, upload, draw
+        return null; // long_text, essay, draw, code
     }
 
     // ---------- Helpers ----------

@@ -42,6 +42,9 @@
 <?php if (array_filter((array)($exam['questions'] ?? []), fn($q) => ($q['type'] ?? '') === 'draw')): ?>
 <script src="<?= View::e(View::asset('/assets/vendor/fabric.min.js')) ?>"></script>
 <?php endif; ?>
+<?php if (($exam['kind'] ?? 'written') === 'essay'): ?>
+<script src="<?= View::e(View::asset('/assets/exam_essay.js')) ?>"></script>
+<?php endif; ?>
 <?php if (($exam['kind'] ?? 'written') === 'code'): ?>
 <script src="<?= View::e(View::asset('/assets/vendor/codeeditor.min.js')) ?>"></script>
 <script src="<?= View::e(View::asset('/assets/exam_code.js')) ?>"></script>

@@ -21,7 +21,7 @@ Teacher works in an admin panel (`/admin`) with a WYSIWYG Markdown editor, drag-
 ## Capabilities and Constraints
 - PHP 8.0+, Composer (`league/commonmark`), file-based storage, Apache/Docker deployment.
 - UI is bilingual, Czech and English (`lang/cs.json`, `lang/en.json`); all copy must exist in both.
-- Exam question types: radio, checkbox, select, short text, number, long text, connect A to B, file upload, draw (Fabric.js).
+- Exam question types: radio, checkbox, select, short text, number, long text, connect A to B, draw (Fabric.js). Two more exam kinds: a single long-form *essay* page (formatting toolbar, word/letter count, paste limited to text copied from the site plus pictures) and *code* assignments.
 - Optional correct answers; partial credit on matching; other types scored by hand.
 - Optional anti-cheating monitoring (page-leave, fullscreen, close/reload, heartbeat), with students told when it is on; flagged events shown to the teacher.
 - Optional per-exam time limit, enforced server-side.
