@@ -63,10 +63,10 @@ lesson page), then their name and surname, and start.
 Teachers:
 
 - Build exam content with these question types: radio, checkbox, select, short
-  text, number, long text, connect A to B (shuffled per student), file
-  upload, draw (Fabric.js, vendored in `public/assets/vendor`: pen, eraser, text boxes, colours, widths)
+  text, number, long text, connect A to B (shuffled per student), draw
+  (Fabric.js, vendored in `public/assets/vendor`: pen, eraser, text boxes, colours, widths)
 - Optional correct answers (several accepted); matching gives partial credit.
-  Long text, upload, draw and questions without a correct answer are scored
+  Long text, draw and questions without a correct answer are scored
   by hand
 - Per exam: title, lesson, code (unique, regenerate any time), content,
   published flag and the anti-cheating options. Once an exam has submissions its
@@ -81,10 +81,31 @@ end. Exam data lives in `data/exams/<class>/<exam>/` (`exam.json`, `submissions/
 `files/`) and exam content in `data/exam_contents/<id>.json` (not in `content/`,
 so they are not mistaken for topics).
 
+### Essay exams
+
+An *Essay* content is a single prompt (with points). The student gets one
+long-form page: a paper-like editor with a toolbar (heading styles, six fonts,
+sizes, bold/italic/underline/strikethrough, super/subscript, lists, alignment,
+undo/redo, clear formatting) and a status bar at the bottom with a live **word
+count** and **letter count** (letters only, not digits or spaces). The essay is
+scored by hand.
+
+- **Pasting is restricted.** Text can only be pasted if it was copied from the
+  exam page itself (the site remembers what was copied; anything else on the
+  clipboard is refused, and so are text drops from other windows). **Pictures
+  can be pasted or dropped** (shrunk to 1400 px and stored inline) unless they
+  arrive together with text. Each refused paste is shown to the student and, when
+  monitoring is on, logged to the teacher as *paste_blocked*. Like the other
+  guards this is browser-side: it cannot stop a student from typing text in.
+- The answer is HTML. The server rebuilds it from an allow-list
+  (`Exams::cleanEssayHtml`: a handful of tags, a few style properties, only
+  `data:image/...` pictures) before storing it, so nothing a browser sends can
+  inject script into the teacher's view.
+
 ### Code exams
 
 An exam content has a **type**, chosen when it is created: *Written* (the
-question types above), *Upload* (file upload questions only) or *Code*.
+question types above), *Essay* or *Code*.
 
 A *Code* content is a list of **assignments**. Each has a title, a description
 in Markdown, a language (Python or JavaScript), optional starting code and

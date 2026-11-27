@@ -17,12 +17,13 @@
  *     init(ctx)            exam is rendered. ctx = { root, exam, settings,
  *                          log(type, detail, atMs), beacon(type, detail),
  *                          resumed, lastSeen, suspendBlur(), t(key) }  (suspendBlur: call before opening a
- *                          native dialog such as a file picker)
+ *                          native dialog)
  *     onBeforeSubmit()     close any open "episodes" so they are logged
  *     onFinish()           exam submitted: clean up (leave fullscreen, ...)
  * Every question is a  <section data-question-id data-question-type>  and every
  * answer control has class "exam-input", so a later module (e.g. anti-paste)
- * can listen on ctx.root with event delegation.
+ * can listen on ctx.root with event delegation. (The essay editor, exam_essay.js,
+ * already restricts pasting itself and logs `paste_blocked`.)
  * Events are {type, at (unix s), detail}. They are kept in the localStorage
  * draft (so a reload does not erase them), sent with the final submission and
  * shown in red on the teacher's submission page. "page_closed" is the one
@@ -37,8 +38,6 @@
 
     var T = JSON.parse(document.getElementById('exam-i18n').textContent);
     function t(key) { return T['exam.' + key] || key; }
-
-    var MAX_FILE = 10 * 1024 * 1024;
 
     // ------------------------------------------------------------------
     // Guard registry (see header comment)
@@ -214,7 +213,11 @@
     }
 
     function isAnswered(q) {
-        if (q.type === 'upload' || q.type === 'draw') { return !!state.files[q.id]; }
+        if (q.type === 'draw') { return !!state.files[q.id]; }
+        if (q.type === 'essay') {
+            var h = state.answers[q.id];
+            return typeof h === 'string' && (/<img/i.test(h) || h.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() !== '');
+        }
         var a = state.answers[q.id];
         if (q.type === 'code') { return typeof a === 'string' && a.trim() !== '' && a !== (q.starter || ''); }
         if (q.type === 'checkbox') { return Array.isArray(a) && a.length > 0; }
@@ -433,36 +436,6 @@
         return el('div', { class: 'match' }, [el('p', { class: 'empty', text: t('match_hint') }), board]);
     };
 
-    renderers.upload = function (q) {
-        var info = el('span', { class: 'file-info' });
-        var input = el('input', { type: 'file', class: 'exam-input' });
-        var remove = el('button', { type: 'button', class: 'button-secondary', text: t('file_remove'), hidden: 'hidden' });
-        function refresh() {
-            var f = state.files[q.id];
-            info.textContent = f ? f.name : '';
-            remove.hidden = !f;
-        }
-        input.addEventListener('click', function () { suspendBlur(); });
-        input.addEventListener('change', function () {
-            var f = input.files[0];
-            if (!f) { return; }
-            if (f.size > MAX_FILE) {
-                showDialog(t('file_too_large'), t('dialog_ok'), null);
-                input.value = '';
-                return;
-            }
-            state.files[q.id] = { blob: f, name: f.name };
-            refresh();
-        });
-        remove.addEventListener('click', function () {
-            delete state.files[q.id];
-            input.value = '';
-            refresh();
-        });
-        refresh();
-        return el('div', { class: 'q-upload' }, [input, info, remove]);
-    };
-
     // Draw: opens a full-screen editor (Fabric.js, vendored in /assets/vendor)
     // with pen, eraser, text boxes, colours and widths. The editor content is
     // kept (as Fabric JSON) so the student can re-open and keep editing.
@@ -651,6 +624,14 @@
             // Code exams: sidebar of assignments + editor (exam_code.js). It also places the submit button.
             root = window.MathubExamCode.render({
                 state: state, app: app, el: el, t: t, setAnswer: setAnswer, fmtPoints: fmtPoints, showDialog: showDialog,
+                submitButton: submit, errorBox: errorBox
+            });
+            main.appendChild(root);
+        } else if (state.exam.kind === 'essay' && window.MathubExamEssay) {
+            // Essay exams: one long-form page (exam_essay.js). It also places the submit button.
+            root = window.MathubExamEssay.render({
+                state: state, app: app, el: el, t: t, setAnswer: setAnswer, fmtPoints: fmtPoints, showDialog: showDialog,
+                log: function (type, detail) { if (settings.monitor !== false) { Guard.log(type, detail); } },
                 submitButton: submit, errorBox: errorBox
             });
             main.appendChild(root);

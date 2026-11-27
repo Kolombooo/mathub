@@ -4,7 +4,7 @@
     <a href="/admin/exam-contents"><?= View::tr('Exam content library') ?></a>
 </p>
 <h1><?= View::tr('Edit exam content') ?>
-    <span class="badge <?= $content['kind'] === 'code' ? 'badge-blue' : '' ?>"><?= View::tr(['written' => 'Written', 'code' => 'Code', 'upload' => 'Upload'][$content['kind']]) ?></span>
+    <span class="badge <?= $content['kind'] === 'code' ? 'badge-blue' : '' ?>"><?= View::tr(['written' => 'Written', 'code' => 'Code', 'essay' => 'Essay'][$content['kind']]) ?></span>
 </h1>
 
 <?php if ($usedBy): ?>
@@ -23,19 +23,20 @@
     </label>
 
     <?php $isCode = $content['kind'] === 'code'; ?>
-    <h2><?= View::tr($isCode ? 'Assignments' : 'Questions') ?></h2>
+    <?php $isEssay = $content['kind'] === 'essay'; ?>
+    <h2><?= View::tr($isCode ? 'Assignments' : ($isEssay ? 'Essay' : 'Questions')) ?></h2>
     <?php if ($isCode): ?>
         <p class="empty"><?= View::tr('Each assignment has a description written in Markdown (tab "Zadání"), a language and optional starting code (tab "Kód"). Code runs in the student\'s browser; there are no automatic tests, so you score the submitted code by hand. Students never see scores.') ?></p>
-    <?php elseif ($content['kind'] === 'upload'): ?>
-        <p class="empty"><?= View::tr('Each question asks the student to upload a file. Uploads are scored by hand.') ?></p>
+    <?php elseif ($isEssay): ?>
+        <p class="empty"><?= View::tr('The student writes one long-form document on a single page, with basic formatting and fonts and a live word and letter count. Pasting text is limited to text copied from this site; pictures can be pasted. The essay is scored by hand. Students never see scores.') ?></p>
     <?php else: ?>
-        <p class="empty"><?= View::tr('Correct answers are optional. Questions without one (and long text, file upload and drawing) are scored by hand. Students never see scores.') ?></p>
+        <p class="empty"><?= View::tr('Correct answers are optional. Questions without one (and long text and drawing) are scored by hand. Students never see scores.') ?></p>
     <?php endif; ?>
     <div id="questions"></div>
     <div class="builder-add">
-        <?php if ($isCode || $content['kind'] === 'upload'): ?>
-            <input type="hidden" id="add-type" value="<?= $isCode ? 'code' : 'upload' ?>">
-            <button type="button" id="add-question"><?= View::tr($isCode ? '+ Add assignment' : '+ Add question') ?></button>
+        <?php if ($isCode || $isEssay): ?>
+            <input type="hidden" id="add-type" value="<?= $isCode ? 'code' : 'essay' ?>">
+            <button type="button" id="add-question"<?= $isEssay ? ' data-single="1"' : '' ?>><?= View::tr($isCode ? '+ Add assignment' : '+ Add essay') ?></button>
         <?php else: ?>
         <select id="add-type">
             <option value="radio"><?= View::tr('Radio (one choice)') ?></option>
@@ -45,7 +46,6 @@
             <option value="number"><?= View::tr('Number') ?></option>
             <option value="long_text"><?= View::tr('Long text') ?></option>
             <option value="match"><?= View::tr('Connect A to B') ?></option>
-            <option value="upload"><?= View::tr('Upload file') ?></option>
             <option value="draw"><?= View::tr('Draw') ?></option>
         </select>
         <button type="button" id="add-question"><?= View::tr('+ Add question') ?></button>

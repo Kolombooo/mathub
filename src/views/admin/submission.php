@@ -88,17 +88,21 @@ $pairById = function (array $q, string $id): ?array {
                         <?php endforeach; ?>
                         </ul>
                         <?php break;
-                    case 'upload':
                     case 'draw':
                         if (empty($a['file'])): ?><em class="muted"><?= View::tr('(nothing uploaded)') ?></em>
                         <?php else:
-                            $url = $subBase . '/files/' . rawurlencode($a['file']);
-                            if ($q['type'] === 'draw'): ?>
-                                <a href="<?= $url ?>" target="_blank"><img class="draw-preview" src="<?= $url ?>" alt="<?= View::tr('Drawing') ?>"></a>
-                            <?php else: ?>
-                                <a href="<?= $url ?>"><?= View::e($a['name']) ?></a>
-                            <?php endif;
-                        endif;
+                            $url = $subBase . '/files/' . rawurlencode($a['file']); ?>
+                            <a href="<?= $url ?>" target="_blank"><img class="draw-preview" src="<?= $url ?>" alt="<?= View::tr('Drawing') ?>"></a>
+                        <?php endif;
+                        break;
+                    case 'essay':
+                        $essay = (string)$a;
+                        if (Exams::essayText($essay) === '' && strpos($essay, '<img') === false): ?><em class="muted"><?= View::tr('(no answer)') ?></em>
+                        <?php else: $stats = Exams::essayStats($essay); ?>
+                            <p class="muted"><?= View::tr('{words} words · {letters} letters', ['words' => $stats['words'], 'letters' => $stats['letters']]) ?></p>
+                            <?php /* Rebuilt from an allow-list when it was submitted (Exams::cleanEssayHtml). */ ?>
+                            <div class="essay-paper essay-review"><?= $essay ?></div>
+                        <?php endif;
                         break;
                     case 'code': ?>
                         <?php if (trim((string)$a) === ''): ?><em class="muted"><?= View::tr('(no answer)') ?></em>

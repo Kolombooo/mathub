@@ -16,8 +16,8 @@
     var LABELS = {
         radio: t('type.radio', 'Radio'), checkbox: t('type.checkbox', 'Checkbox'), select: t('type.select', 'Select'),
         short_text: t('type.short_text', 'Short text'), number: t('type.number', 'Number'), long_text: t('type.long_text', 'Long text'),
-        match: t('type.match', 'Connect A to B'), upload: t('type.upload', 'Upload file'), draw: t('type.draw', 'Draw'),
-        code: t('type.code', 'Assignment')
+        match: t('type.match', 'Connect A to B'), draw: t('type.draw', 'Draw'),
+        code: t('type.code', 'Assignment'), essay: t('type.essay', 'Essay')
     };
 
     function el(tag, attrs, children) {
@@ -178,9 +178,10 @@
         container.innerHTML = '';
         questions.forEach(function (q, i) {
             var isCode = q.type === 'code';
+            var isEssay = q.type === 'essay';
             var text = isCode
                 ? el('input', { type: 'text', maxlength: '200', placeholder: t('code_title', 'Assignment title') })
-                : el('textarea', { rows: '2', placeholder: t('question_text', 'Question text') });
+                : el('textarea', { rows: isEssay ? '5' : '2', placeholder: isEssay ? t('essay_prompt', 'Essay prompt (what the student should write about)') : t('question_text', 'Question text') });
             text.value = q.text || '';
             text.addEventListener('input', function () { q.text = text.value; });
 
@@ -193,6 +194,7 @@
             else if (q.options) { body = optionsEditor(q); }
             else if (q.accepted) { body = acceptedEditor(q); }
             else if (q.pairs) { body = pairsEditor(q); }
+            else if (isEssay) { body = el('p', { class: 'muted', text: t('essay_hint', 'The student writes one long document on a single page. Scored by hand.') }); }
             else { body = el('p', { class: 'muted', text: t('manual', 'Scored by hand.') }); }
 
             container.appendChild(el('div', { class: 'qcard' }, [
@@ -210,9 +212,14 @@
                 body
             ]));
         });
+        syncAdd();
     }
 
-    document.getElementById('add-question').addEventListener('click', function () {
+    var addButton = document.getElementById('add-question');
+    // Essay content is one document: once it has its question there is nothing more to add.
+    function syncAdd() { if (addButton.dataset.single) { addButton.style.display = questions.length > 0 ? 'none' : ''; } }
+    addButton.addEventListener('click', function () {
+        if (addButton.dataset.single && questions.length) { return; }
         questions.push(blank(document.getElementById('add-type').value));
         render();
         var cards = container.querySelectorAll('.qcard');
