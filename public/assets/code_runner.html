@@ -21,7 +21,8 @@
   Protocol (window.postMessage, both directions checked against event.source):
     parent -> runner : {t:'run', id, language, code, stdin, base, timeoutMs}
                        {t:'stop'}   {t:'preload', language, base}
-    runner -> parent : {t:'ready'}
+                       {t:'stdin', id, text, eof}   a line typed in the console
+    runner -> parent : {t:'ready'}   {t:'mode', id, live}   {t:'input', id} (program waits for a line)
                        {t:'out', id, s:'stdout'|'stderr'|'info', text}
                        {t:'img', id, url}   (matplotlib figure, PNG data URL)
                        {t:'status', id, text}
@@ -35,8 +36,22 @@
 // ---- JavaScript worker (classic) ----
 var lines = [];
 var timers = 0;
+var live = false, sab = null, ctrl = null;
 function send(t, o) { postMessage(Object.assign({ t: t }, o || {})); }
 function out(s, text) { send('out', { s: s, text: text }); }
+
+// One line of input. Live mode: ask the console and block (Atomics.wait) until the student
+// presses Enter; the runner page writes the line into the shared buffer. Otherwise read from
+// the pre-filled input box. Returns null at end of input.
+function readLine() {
+    if (!live) { return lines.length ? lines.shift() : null; }
+    Atomics.store(ctrl, 0, 0);
+    send('input');
+    Atomics.wait(ctrl, 0, 0);
+    if (Atomics.load(ctrl, 0) === 2) { return null; }
+    var bytes = new Uint8Array(sab, 8, ctrl[1]).slice();
+    return new TextDecoder().decode(bytes).replace(/\r?\n$/, '');
+}
 
 function fmt(v, depth) {
     depth = depth || 0;
@@ -103,23 +118,23 @@ var realSetTimeout = self.setTimeout.bind(self);
 var realClearTimeout = self.clearTimeout.bind(self);
 var realSetInterval = self.setInterval.bind(self);
 var realClearInterval = self.clearInterval.bind(self);
-var live = {};
+var pending = {};
 self.setTimeout = function (fn, ms) {
     var args = Array.prototype.slice.call(arguments, 2);
     timers++;
-    var id = realSetTimeout(function () { delete live[id]; timers--; if (typeof fn === 'function') { fn.apply(self, args); } }, ms);
-    live[id] = 1;
+    var id = realSetTimeout(function () { delete pending[id]; timers--; if (typeof fn === 'function') { fn.apply(self, args); } }, ms);
+    pending[id] = 1;
     return id;
 };
-self.clearTimeout = function (id) { if (live[id]) { delete live[id]; timers--; } realClearTimeout(id); };
+self.clearTimeout = function (id) { if (pending[id]) { delete pending[id]; timers--; } realClearTimeout(id); };
 self.setInterval = function (fn, ms) {
     var args = Array.prototype.slice.call(arguments, 2);
     timers++;
     var id = realSetInterval(function () { if (typeof fn === 'function') { fn.apply(self, args); } }, ms);
-    live[id] = 1;
+    pending[id] = 1;
     return id;
 };
-self.clearInterval = function (id) { if (live[id]) { delete live[id]; timers--; } realClearInterval(id); };
+self.clearInterval = function (id) { if (pending[id]) { delete pending[id]; timers--; } realClearInterval(id); };
 
 ['log', 'info', 'debug'].forEach(function (k) { console[k] = function () { out('stdout', line(arguments)); }; });
 ['warn', 'error'].forEach(function (k) { console[k] = function () { out('stderr', line(arguments)); }; });
@@ -127,8 +142,8 @@ console.table = function (d) { out('stdout', line([d])); };
 self.alert = function (m) { out('stdout', String(m) + '\n'); };
 self.prompt = function (m) {
     if (m) { out('stdout', String(m)); }
-    var l = lines.length ? lines.shift() : null;
-    if (l !== null) { out('stdout', l + '\n'); } else { out('stdout', '\n'); }
+    var l = readLine();
+    if (!live) { out('stdout', (l === null ? '' : l) + '\n'); } // live mode: the console echoes what was typed
     return l;
 };
 self.addEventListener('unhandledrejection', function (e) { out('stderr', 'Unhandled promise rejection: ' + fmt(e.reason) + '\n'); });
@@ -138,6 +153,7 @@ self.onmessage = async function (e) {
     var m = e.data;
     lines = String(m.stdin || '').split('\n');
     if (lines.length && lines[lines.length - 1] === '') { lines.pop(); }
+    live = !!m.live; sab = m.sab || null; ctrl = sab ? new Int32Array(sab, 0, 2) : null;
     send('started');
     try {
         var AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -157,9 +173,21 @@ self.onmessage = async function (e) {
 // ---- Python worker (classic; Pyodide) ----
 var py = null;
 var lines = [];
+var live = false, sab = null, ctrl = null;
 var ALIASES = { PIL: 'pillow', sklearn: 'scikit-learn', bs4: 'beautifulsoup4', yaml: 'pyyaml', cv2: 'opencv-python', dateutil: 'python-dateutil' };
 function send(t, o) { postMessage(Object.assign({ t: t }, o || {})); }
 function out(s, text) { send('out', { s: s, text: text }); }
+
+// One line of input; see the JavaScript worker. undefined = end of input.
+function readLine() {
+    if (!live) { return lines.length ? lines.shift() : undefined; }
+    Atomics.store(ctrl, 0, 0);
+    send('input');
+    Atomics.wait(ctrl, 0, 0);
+    if (Atomics.load(ctrl, 0) === 2) { return undefined; }
+    var bytes = new Uint8Array(sab, 8, ctrl[1]).slice();
+    return new TextDecoder().decode(bytes).replace(/\r?\n$/, '');
+}
 
 function cleanTraceback(msg) {
     // Hide Pyodide's own frames: keep only what the student wrote.
@@ -180,25 +208,24 @@ self.onmessage = async function (e) {
         try {
             send('status', { text: 'loading' });
             importScripts(m.base + 'pyodide.js');
-            py = await loadPyodide({
-                indexURL: m.base,
-                stdout: function (s) { out('stdout', s + '\n'); },
-                stderr: function (s) { out('stderr', s + '\n'); }
-            });
-            py.setStdin({ stdin: function () {
-                if (!lines.length) { return undefined; }
-                return lines.shift();
-            } });
+            py = await loadPyodide({ indexURL: m.base });
+            // Raw, unbuffered writes so a prompt without a newline shows up before input() waits.
+            var decOut = new TextDecoder(), decErr = new TextDecoder();
+            py.setStdout({ isatty: true, write: function (buf) { out('stdout', decOut.decode(buf, { stream: true })); return buf.length; } });
+            py.setStderr({ isatty: true, write: function (buf) { out('stderr', decErr.decode(buf, { stream: true })); return buf.length; } });
+            py.setStdin({ stdin: function () { return readLine(); } });
             // input(): print the prompt and echo the (pre-supplied) answer, like a terminal would.
             py.runPython([
                 "import os, sys, builtins, warnings",
                 "os.environ['MPLBACKEND']='AGG'",
                 "warnings.filterwarnings('ignore', message='FigureCanvasAgg is non-interactive')",
+                "_mathub_echo = True",
                 "_real_input = builtins.input",
                 "def _input(prompt=''):",
                 "    sys.stdout.write(str(prompt)); sys.stdout.flush()",
                 "    s = _real_input('')",
-                "    sys.stdout.write(s + '\\n'); sys.stdout.flush()",
+                "    if _mathub_echo:",
+                "        sys.stdout.write(s + '\\n'); sys.stdout.flush()",
                 "    return s",
                 "builtins.input = _input"
             ].join('\n'));
@@ -212,6 +239,8 @@ self.onmessage = async function (e) {
 
     lines = String(m.stdin || '').split('\n');
     if (lines.length && lines[lines.length - 1] === '') { lines.pop(); }
+    live = !!m.live; sab = m.sab || null; ctrl = sab ? new Int32Array(sab, 0, 2) : null;
+    py.globals.set('_mathub_echo', !live); // live mode: the console echoes what was typed
     var ok = true;
     try {
         send('status', { text: 'packages' });
@@ -308,6 +337,16 @@ self.onmessage = async function (e) {
         if (pyw) { try { pyw.worker.terminate(); } catch (e) { /* gone */ } pyw = null; }
     }
 
+    // The run timeout and the overall cap restart whenever the program is not waiting for a human.
+    function arm() {
+        if (!current) { return; }
+        var id = current.id;
+        clearTimeout(current.timer);
+        clearTimeout(current.hard);
+        current.timer = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, current.timeoutMs);
+        current.hard = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, HARD_CAP);
+    }
+
     function finish(ok, reason) {
         if (!current) { return; }
         var c = current;
@@ -330,20 +369,38 @@ self.onmessage = async function (e) {
         } else if (m.t === 'status') {
             post({ t: 'status', id: current.id, text: m.text });
         } else if (m.t === 'started') {
-            clearTimeout(current.timer);
-            var id = current.id;
-            current.timer = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, current.timeoutMs);
+            arm();
             post({ t: 'status', id: current.id, text: 'running' });
+        } else if (m.t === 'input') {
+            // The program is blocked waiting for a line: nothing can time out while a human types.
+            clearTimeout(current.timer);
+            clearTimeout(current.hard);
+            post({ t: 'input', id: current.id });
         } else if (m.t === 'done') {
             finish(m.ok, null);
         }
+    }
+
+    // A line (or end-of-input) typed in the console: hand it to the blocked worker.
+    function sendStdin(m) {
+        if (!current || current.id !== m.id || !current.sab) { return; }
+        var ctrl = new Int32Array(current.sab, 0, 2);
+        var bytes = new TextEncoder().encode(String(m.text || '')).slice(0, 65536);
+        new Uint8Array(current.sab, 8).set(bytes);
+        ctrl[1] = bytes.length;
+        arm();
+        Atomics.store(ctrl, 0, m.eof ? 2 : 1);
+        Atomics.notify(ctrl, 0);
     }
 
     function run(m) {
         if (current) { finish(false, 'stopped'); }
         var kind = m.language === 'python' ? 'python' : 'javascript';
         var timeoutMs = Math.min(+m.timeoutMs || DEFAULT_TIMEOUT[kind], 120000);
-        current = { id: m.id, kind: kind, worker: null, chars: 0, timeoutMs: timeoutMs };
+        // Live input needs a SharedArrayBuffer, i.e. a cross-origin isolated page (see exam_code.js).
+        var live = self.crossOriginIsolated === true && typeof SharedArrayBuffer === 'function';
+        current = { id: m.id, kind: kind, worker: null, chars: 0, timeoutMs: timeoutMs, live: live, sab: live ? new SharedArrayBuffer(8 + 65536) : null };
+        post({ t: 'mode', id: m.id, live: live });
         var id = m.id;
         current.hard = setTimeout(function () { if (current && current.id === id) { finish(false, 'timeout'); } }, HARD_CAP);
         try {
@@ -356,7 +413,7 @@ self.onmessage = async function (e) {
                     post({ t: 'out', id: id, s: 'stderr', text: (e.message || 'Worker error') + '\n' });
                     finish(false, 'crash');
                 };
-                w.postMessage({ code: m.code, stdin: m.stdin });
+                w.postMessage({ code: m.code, stdin: m.stdin, live: current.live, sab: current.sab });
             } else {
                 var p = ensurePython(m.base);
                 current.worker = p.worker;
@@ -368,7 +425,7 @@ self.onmessage = async function (e) {
                         finish(false, 'crash');
                         return;
                     }
-                    p.worker.postMessage({ t: 'run', code: m.code, stdin: m.stdin });
+                    p.worker.postMessage({ t: 'run', code: m.code, stdin: m.stdin, live: current.live, sab: current.sab });
                 };
                 if (p.ready) { go(true); } else { post({ t: 'status', id: id, text: 'loading' }); p.waiters.push(go); }
             }
@@ -383,6 +440,7 @@ self.onmessage = async function (e) {
         var m = e.data || {};
         if (m.t === 'run') { run(m); }
         else if (m.t === 'stop') { finish(false, 'stopped'); }
+        else if (m.t === 'stdin') { sendStdin(m); }
         else if (m.t === 'preload' && m.language === 'python') { try { ensurePython(m.base); } catch (err) { /* run will report */ } }
     });
     post({ t: 'ready' });

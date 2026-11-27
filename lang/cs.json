@@ -362,5 +362,8 @@
     "+ Add assignment": "+ Přidat úlohu",
     "Each assignment has a description written in Markdown (tab \"Zadání\"), a language and optional starting code (tab \"Kód\"). Code runs in the student's browser; there are no automatic tests, so you score the submitted code by hand. Students never see scores.": "Každá úloha má zadání psané v Markdownu (záložka „Zadání“), jazyk a volitelný výchozí kód (záložka „Kód“). Kód se spouští v prohlížeči studenta; automatické testy nejsou, odevzdaný kód bodujete ručně. Studenti body nikdy nevidí.",
     "Each question asks the student to upload a file. Uploads are scored by hand.": "Každá otázka vyžaduje nahrání souboru. Nahrané soubory se hodnotí ručně.",
-    "autosaved draft": "průběžně uložený koncept"
+    "autosaved draft": "průběžně uložený koncept",
+    "exam.code_console": "Konzole",
+    "exam.code_console_input": "Napište vstup pro program a stiskněte Enter",
+    "exam.code_waiting": "Čeká na váš vstup…"
 }

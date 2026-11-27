@@ -6,6 +6,11 @@
  * with two tabs, "Zadání" (Markdown written by the teacher, rendered by the
  * server) and "Kód" (a CodeMirror editor, Run/Stop, stdin and an output panel).
  *
+ * Console: output and input share one live console. When the page is cross-origin
+ * isolated (the server sends COOP/COEP for code exams) a running program that calls
+ * input() / prompt() really waits: a field appears after its prompt and Enter sends the line
+ * (Ctrl+D = end of input). Without isolation the old pre-filled "input" box is used.
+ *
  * Running code: entirely in the student's browser, inside a sandboxed iframe
  * (code_runner.html) that hosts Web Workers: JavaScript natively, Python via
  * Pyodide (WebAssembly, loaded from a CDN on first use).
@@ -48,7 +53,7 @@
 
         function ensureFrame() {
             if (frame) { return; }
-            frame = el('iframe', { sandbox: 'allow-scripts', title: 'runner', 'aria-hidden': 'true', tabindex: '-1', class: 'code-runner-frame' });
+            frame = el('iframe', { sandbox: 'allow-scripts', allow: 'cross-origin-isolated', title: 'runner', 'aria-hidden': 'true', tabindex: '-1', class: 'code-runner-frame' });
             frame.src = app.dataset.runnerUrl;
             document.body.appendChild(frame);
             window.addEventListener('message', function (e) {
@@ -222,10 +227,15 @@
 
             var stdin = el('textarea', { class: 'mono code-stdin', rows: '3', placeholder: t('code_stdin_ph'), 'aria-label': t('code_stdin') });
             var stdinBox = el('details', { class: 'code-stdin-box' }, [el('summary', { text: t('code_stdin') }), stdin]);
+            stdinBox.hidden = window.crossOriginIsolated === true; // live console instead (see 'mode')
             code.appendChild(stdinBox);
 
             var output = el('pre', { class: 'code-output', 'aria-label': t('code_output'), tabindex: '0' });
-            var outHead = el('div', { class: 'code-output-head' }, [el('strong', { text: t('code_output') })]);
+            // Live console: while the program waits for input() / prompt(), this field appears right
+            // after the text the program printed (usually its prompt), like a terminal.
+            var liveInput = el('input', { type: 'text', class: 'code-console-input', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': t('code_console_input'), hidden: 'hidden' });
+            output.addEventListener('click', function () { if (!liveInput.hidden) { liveInput.focus(); } });
+            var outHead = el('div', { class: 'code-output-head' }, [el('strong', { text: t('code_console') })]);
             var clearBtn = el('button', { type: 'button', class: 'button-secondary small', text: t('code_clear') });
             outHead.appendChild(clearBtn);
             code.appendChild(outHead);
@@ -287,10 +297,35 @@
                 outChars += text.length;
                 var span = el('span', { class: 'out-' + stream });
                 span.textContent = text;
-                output.appendChild(span);
+                output.insertBefore(span, liveInput.hidden ? null : liveInput);
                 output.scrollTop = output.scrollHeight;
             }
-            function clearOutput() { output.innerHTML = ''; outChars = 0; }
+            function clearOutput() { hideInput(); output.innerHTML = ''; outChars = 0; }
+
+            var activeRun = null;
+            function showInput() {
+                liveInput.value = '';
+                liveInput.hidden = false;
+                output.appendChild(liveInput);
+                output.scrollTop = output.scrollHeight;
+                liveInput.focus();
+            }
+            function hideInput() {
+                liveInput.hidden = true;
+                if (liveInput.parentNode) { liveInput.parentNode.removeChild(liveInput); }
+            }
+            function submitLine(eof) {
+                if (!activeRun || liveInput.hidden) { return; }
+                var text = eof ? '' : liveInput.value;
+                hideInput();
+                if (!eof) { addText('stdin', text + '\n'); }
+                post({ t: 'stdin', id: activeRun, text: text, eof: !!eof });
+            }
+            liveInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); submitLine(false); }
+                else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); submitLine(true); }
+                e.stopPropagation(); // keep exam-wide shortcuts out of the console
+            });
             clearBtn.addEventListener('click', clearOutput);
 
             function setRunning(on) {
@@ -304,15 +339,20 @@
             runBtn.addEventListener('click', function () {
                 if (running) { runInfo.textContent = t('code_busy'); return; }
                 clearOutput();
-                // The program reads input but nothing was provided: show the box instead of failing silently.
-                if (!stdin.value && /\b(input|prompt|readline)\s*\(/.test(editor.getValue())) { stdinBox.open = true; }
                 var id = ++seq;
                 running = { qid: q.id, id: id };
+                activeRun = id;
                 setRunning(true);
                 runInfo.textContent = q.language === 'python' ? t('code_loading') : t('code_running');
                 var t0 = Date.now();
                 listeners[id] = function (m) {
                     if (m.t === 'out') { addText(m.s, m.text); }
+                    else if (m.t === 'input') { showInput(); runInfo.textContent = t('code_waiting'); }
+                    else if (m.t === 'mode') {
+                        // No live input (page not cross-origin isolated): fall back to the pre-filled input box.
+                        stdinBox.hidden = m.live;
+                        if (!m.live && /\b(input|prompt|readline)\s*\(/.test(editor.getValue())) { stdinBox.open = true; }
+                    }
                     else if (m.t === 'img') {
                         var img = el('img', { class: 'code-figure', alt: t('code_figure'), src: m.url });
                         output.appendChild(img);
@@ -320,11 +360,13 @@
                     } else if (m.t === 'status') {
                         if (m.text === 'loading') { runInfo.textContent = t('code_loading'); }
                         else if (m.text === 'packages') { runInfo.textContent = t('code_packages'); }
-                        else if (m.text === 'running') { runInfo.textContent = t('code_running'); }
+                        else if (m.text === 'running') { runInfo.textContent = t('code_running'); if (!liveInput.hidden) { runInfo.textContent = t('code_waiting'); } }
                         else if (m.text.indexOf('pkg:') === 0) { runInfo.textContent = m.text.slice(4).slice(0, 80); }
                     } else if (m.t === 'done') {
                         delete listeners[id];
                         running = null;
+                        activeRun = null;
+                        hideInput();
                         setRunning(false);
                         if (m.reason && REASONS[m.reason]) { addText('info', '\n' + t(REASONS[m.reason]) + '\n'); }
                         else if (m.ok) { addText('info', (output.textContent ? '\n' : '') + t('code_finished').replace('{s}', ((Date.now() - t0) / 1000).toFixed(1)) + '\n'); }

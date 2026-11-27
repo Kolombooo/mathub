@@ -38,6 +38,13 @@ if ($method === 'GET' && count($decoded) === 3 && $decoded[0] === 'exams') {
         redirect('/');
     }
     $lang = Storage::getClassLang($classSlug);
+    if (($exam['kind'] ?? 'written') === 'code') {
+        // Cross-origin isolation gives the code runner SharedArrayBuffer, which lets input() /
+        // prompt() wait for a line typed in the live console. The exam page only loads same-origin
+        // resources, so this is safe; images in assignment text must therefore be uploaded files.
+        header('Cross-Origin-Opener-Policy: same-origin');
+        header('Cross-Origin-Embedder-Policy: require-corp');
+    }
     View::render('exam', [
         'title' => $exam['title'],
         'bodyClass' => 'page-exam',
