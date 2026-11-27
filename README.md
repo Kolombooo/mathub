@@ -98,13 +98,23 @@ automatic tests).
   (`public/assets/code_runner.html`) with one Web Worker per run; the server never
   executes student code. Infinite loops are killed (JS 10 s, Python 30 s) and the
   output is capped. Memory cannot be limited from a browser.
+- **Live console**: output and input share one console. When a program calls
+  `input()` / `prompt()` it really waits: a field appears after its prompt, Enter
+  sends the line, Ctrl+D ends the input, Stop kills the program, and the time limit
+  does not run while it waits for the student. This needs the page to be
+  cross-origin isolated, so code exam pages are sent with `Cross-Origin-Opener-Policy:
+  same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (and
+  `code_runner.html` with COEP, see `public/.htaccess`; `mod_headers` must be on).
+  Consequence: images in assignment text must be uploaded to the site, not linked
+  from other domains. Without isolation the console falls back to a pre-filled input
+  box.
 - **JavaScript**: `import` of CDN URLs works; bare names (`import _ from 'lodash'`)
-  are loaded from esm.sh. `prompt()` reads the input box.
+  are loaded from esm.sh. `prompt()` reads from the console.
 - **Python** runs on [Pyodide](https://pyodide.org) (WebAssembly), loaded from the
   jsDelivr CDN on first use (~10 MB, then cached). Libraries shipped with Pyodide
   (numpy, pandas, matplotlib, scipy, sympy, …) load automatically on `import`;
   other pure-Python packages are installed from PyPI with micropip. `input()` reads
-  the input box; matplotlib figures are shown under the output. Students therefore
+  from the console; matplotlib figures are shown under the output. Students therefore
   need internet access to `cdn.jsdelivr.net`, `pypi.org` / `files.pythonhosted.org`
   and `esm.sh`. To self-host Pyodide set `MATHUB_PYODIDE_URL` to its base URL
   (ending in `/`).

@@ -116,5 +116,8 @@
     "builder.code_description_ph": "Assignment text in Markdown…",
     "builder.code_starter": "Starting code",
     "builder.code_starter_hint": "Starting code – shown in the “Code” tab (optional).",
-    "builder.code_chat": "Chatbot assistant (coming soon)"
+    "builder.code_chat": "Chatbot assistant (coming soon)",
+    "exam.code_console": "Console",
+    "exam.code_console_input": "Type input for the program and press Enter",
+    "exam.code_waiting": "Waiting for your input…"
 }

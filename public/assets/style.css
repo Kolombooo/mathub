@@ -899,3 +899,10 @@ button.code-tab.is-active { color: var(--blue); border-bottom-color: var(--blue)
     .code-list { flex-direction: row; overflow-x: auto; overflow-y: visible; gap: 0.25rem; }
     button.code-item { width: auto; flex: 0 0 auto; max-width: 14rem; }
 }
+
+/* Live console: the input field sits inline right after the program's prompt. */
+.code-console-input { display: inline-block; width: 24ch; max-width: 100%; field-sizing: content; min-width: 2ch; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--blue); border-radius: 0; background: transparent; color: var(--text); font: inherit; outline: none; box-shadow: none; }
+.code-console-input:focus { border-bottom-color: var(--blue); box-shadow: none; }
+.code-console-input[hidden] { display: none; }
+.code-output .out-stdin { color: var(--blue); }
+.code-output[tabindex]:focus-visible { box-shadow: var(--focus-ring); outline: none; }
